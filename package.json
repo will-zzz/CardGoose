@@ -1,0 +1,23 @@
+{
+  "name": "forgecard",
+  "private": true,
+  "scripts": {
+    "dev:frontend": "pnpm --filter frontend dev",
+    "dev:api": "pnpm --filter api dev",
+    "lint": "pnpm -r run lint",
+    "format": "prettier --write \"frontend/**/*.{ts,tsx,js,json,css}\" \"api/**/*.{ts,js,json}\"",
+    "format:check": "prettier --check \"frontend/**/*.{ts,tsx,js,json,css}\" \"api/**/*.{ts,js,json}\"",
+    "test:all": "pnpm --filter api test && cd worker && PYTHONPATH=src python3 -m pytest",
+    "docker:up": "docker compose up -d postgres localstack",
+    "docker:down": "docker compose down"
+  },
+  "devDependencies": {
+    "eslint": "^9.17.0",
+    "prettier": "^3.4.2",
+    "typescript": "^5.7.2"
+  },
+  "packageManager": "pnpm@9.15.0",
+  "engines": {
+    "node": ">=20"
+  }
+}

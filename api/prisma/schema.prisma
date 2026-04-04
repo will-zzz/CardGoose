@@ -1,0 +1,60 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+/// Auth: email + password (hashed); JWT issued separately.
+model User {
+  id        String    @id @default(uuid()) @db.Uuid
+  email     String    @unique
+  passwordHash String @map("password_hash")
+  createdAt DateTime  @default(now()) @map("created_at")
+  updatedAt DateTime  @updatedAt @map("updated_at")
+
+  projects Project[]
+}
+
+model Project {
+  id        String   @id @default(uuid()) @db.Uuid
+  userId    String   @map("user_id") @db.Uuid
+  name      String
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  user    User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  layouts Layout[]
+  assets  Asset[]
+}
+
+/// react-konva stage JSON + metadata (hybrid schema from design doc).
+model Layout {
+  id          String   @id @default(uuid()) @db.Uuid
+  projectId   String   @map("project_id") @db.Uuid
+  name        String
+  lastUpdated DateTime @default(now()) @map("last_updated")
+  state       Json
+
+  project Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  @@index([projectId])
+  @@index([lastUpdated])
+}
+
+/// art_key -> S3 location; layouts reference keys, not raw paths.
+model Asset {
+  id        String   @id @default(uuid()) @db.Uuid
+  projectId String   @map("project_id") @db.Uuid
+  artKey    String   @map("art_key")
+  s3Key     String   @map("s3_key")
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  project Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  @@unique([projectId, artKey])
+  @@index([projectId])
+}
