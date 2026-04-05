@@ -1212,7 +1212,7 @@ button.zone-row-body:hover {
   height: var(--layout-editor-status-bar-h);
   min-height: var(--layout-editor-status-bar-h);
   display: flex;
-  align-items: center;
+  align-items: stretch;
   padding: 0 8px;
   background: #161616;
   border-top: 1px solid rgba(255, 255, 255, 0.06);
@@ -1221,10 +1221,13 @@ button.zone-row-body:hover {
 }
 
 .layout-editor-status-bar-btn {
-  padding: 0 6px;
-  margin: 0;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 0 10px 0 14px;
+  margin: 0 0 0 -8px;
   border: none;
-  border-radius: 4px;
+  border-radius: 0;
   background: transparent;
   color: rgba(161, 161, 170, 0.95);
   font: inherit;
@@ -1234,6 +1237,12 @@ button.zone-row-body:hover {
   letter-spacing: 0.01em;
   cursor: pointer;
   -webkit-font-smoothing: antialiased;
+}
+
+.layout-editor-status-bar-icon {
+  flex-shrink: 0;
+  opacity: 0.92;
+  color: currentColor;
 }
 
 .layout-editor-status-bar-btn:hover {

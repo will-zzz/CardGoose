@@ -22,6 +22,7 @@ import {
   Text,
   Transformer,
 } from 'react-konva';
+import { Layers } from 'lucide-react';
 import type { LayoutElement, LayoutStateV2 } from '../types/layout';
 import { DEFAULT_NEW_TEXT } from '../types/layout';
 import { applyTemplate } from '../lib/template';
@@ -930,6 +931,7 @@ export const LayoutEditor = forwardRef<LayoutEditorHandle, LayoutEditorProps>(fu
           aria-controls={deckDrawerId}
           onClick={() => setDeckPreviewOpen((o) => !o)}
         >
+          <Layers className="layout-editor-status-bar-icon" size={14} aria-hidden />
           Deck preview
         </button>
       </footer>
