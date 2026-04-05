@@ -1,5 +1,5 @@
 import { Group as KonvaGroup, Image as KonvaImage, Layer, Rect, Stage, Text } from 'react-konva';
-import type { LayoutNode, LayoutStateV2 } from '../types/layout';
+import type { LayoutElement, LayoutStateV2 } from '../types/layout';
 import { applyTemplate } from '../lib/template';
 import { isVisible } from '../lib/layoutTree';
 import { useImageElement } from './useImageElement';
@@ -7,7 +7,7 @@ import { useImageElement } from './useImageElement';
 function RectEl({
   el,
 }: {
-  el: Extract<LayoutNode, { type: 'rect' }>;
+  el: Extract<LayoutElement, { type: 'rect' }>;
 }) {
   return (
     <Rect
@@ -27,7 +27,7 @@ function TextEl({
   el,
   row,
 }: {
-  el: Extract<LayoutNode, { type: 'text' }>;
+  el: Extract<LayoutElement, { type: 'text' }>;
   row: Record<string, string>;
 }) {
   const text = applyTemplate(el.text, row);
@@ -51,7 +51,7 @@ function ImageEl({
   el,
   assetUrls,
 }: {
-  el: Extract<LayoutNode, { type: 'image' }>;
+  el: Extract<LayoutElement, { type: 'image' }>;
   assetUrls: Record<string, string>;
 }) {
   const url = assetUrls[el.artKey];
@@ -87,20 +87,11 @@ function CardNode({
   row,
   assetUrls,
 }: {
-  node: LayoutNode;
+  node: LayoutElement;
   row: Record<string, string>;
   assetUrls: Record<string, string>;
 }) {
   if (!isVisible(node)) return null;
-  if (node.type === 'group') {
-    return (
-      <KonvaGroup x={node.x} y={node.y} rotation={node.rotation ?? 0}>
-        {node.children.map((c) => (
-          <CardNode key={c.id} node={c} row={row} assetUrls={assetUrls} />
-        ))}
-      </KonvaGroup>
-    );
-  }
   if (node.type === 'rect') return <RectEl el={node} />;
   if (node.type === 'text') return <TextEl el={node} row={row} />;
   return <ImageEl el={node} assetUrls={assetUrls} />;

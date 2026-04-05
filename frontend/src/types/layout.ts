@@ -1,4 +1,4 @@
-/** Card template JSON (Layout.state). v2 = tree + groups + hierarchy. */
+/** Card template JSON (Layout.state). v2 = flat list of zones (no groups). */
 
 export type LayoutLeafFlags = {
   visible?: boolean;
@@ -40,6 +40,7 @@ export type LayoutRect = LayoutLeafFlags & {
   fill?: string;
 };
 
+/** @deprecated Loaded from old saves only; flattened to leaves on read. */
 export type LayoutGroup = {
   type: 'group';
   id: string;
@@ -49,15 +50,13 @@ export type LayoutGroup = {
   visible?: boolean;
   locked?: boolean;
   rotation?: number;
-  /** Hierarchy UI: collapsed children */
   collapsed?: boolean;
   children: LayoutNode[];
 };
 
 export type LayoutNode = LayoutGroup | LayoutText | LayoutImage | LayoutRect;
 
-/** Legacy flat layout (migrated to v2 on load). */
-export type LayoutElement = Exclude<LayoutNode, LayoutGroup>;
+export type LayoutElement = LayoutText | LayoutImage | LayoutRect;
 
 export type LayoutStateV1 = {
   version: 1;
@@ -74,8 +73,20 @@ export type LayoutStateV2 = {
   background?: string;
   /** Editor-only preference; stored for convenience */
   showGrid?: boolean;
-  root: LayoutNode[];
+  root: LayoutElement[];
 };
+
+function flattenNodes(nodes: LayoutNode[], ox = 0, oy = 0): LayoutElement[] {
+  const out: LayoutElement[] = [];
+  for (const n of nodes) {
+    if (n.type === 'group') {
+      out.push(...flattenNodes(n.children, ox + n.x, oy + n.y));
+    } else {
+      out.push({ ...n, x: n.x + ox, y: n.y + oy });
+    }
+  }
+  return out;
+}
 
 export const DEFAULT_NEW_TEXT = 'Card Name';
 
@@ -105,7 +116,7 @@ export function defaultLayoutState(): LayoutStateV2 {
 }
 
 function migrateV1ToV2(v1: LayoutStateV1): LayoutStateV2 {
-  const root: LayoutNode[] = v1.elements.map((el) => ({
+  const root: LayoutElement[] = v1.elements.map((el) => ({
     ...el,
     visible: true,
     locked: false,
@@ -133,7 +144,10 @@ export function isLayoutStateV2(v: unknown): v is LayoutStateV2 {
 }
 
 export function ensureLayoutState(raw: unknown): LayoutStateV2 {
-  if (isLayoutStateV2(raw)) return raw;
+  if (isLayoutStateV2(raw)) {
+    const flat = flattenNodes(raw.root as LayoutNode[]);
+    return { ...raw, root: flat };
+  }
   if (isLayoutStateV1(raw)) return migrateV1ToV2(raw);
   return defaultLayoutState();
 }

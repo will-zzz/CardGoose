@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useMemo, useState } from 'react';
+import { useCallback, useEffect, useLayoutEffect, useRef, useMemo, useState } from 'react';
 import type { ReactNode } from 'react';
 import type Konva from 'konva';
 import type { KonvaEventObject } from 'konva/lib/Node';
@@ -12,11 +12,11 @@ import {
   Text,
   Transformer,
 } from 'react-konva';
-import type { LayoutNode, LayoutStateV2 } from '../types/layout';
+import type { LayoutElement, LayoutStateV2 } from '../types/layout';
 import { DEFAULT_NEW_TEXT } from '../types/layout';
 import { applyTemplate } from '../lib/template';
 import { useImageElement } from './useImageElement';
-import { ZoneHierarchy } from './ZoneHierarchy';
+import { ZoneHierarchy, type ZoneHierarchyToolbarProps } from './ZoneHierarchy';
 import {
   applyInsert,
   cloneWithNewIds,
@@ -24,7 +24,7 @@ import {
   insertAfterSiblingDeep,
   isLocked,
   isVisible,
-  moveNodeInTree,
+  moveNodeInFlatList,
   removeNodeById,
   updateNodeInState,
 } from '../lib/layoutTree';
@@ -65,7 +65,7 @@ function ImageShape({
   onDragEnd,
   onTransformEnd,
 }: {
-  el: Extract<LayoutNode, { type: 'image' }>;
+  el: Extract<LayoutElement, { type: 'image' }>;
   assetUrls: Record<string, string>;
   selected: boolean;
   setNodeRef: (id: string, node: Konva.Node | null) => void;
@@ -120,7 +120,7 @@ function EditorNode({
   onChange,
   state,
 }: {
-  node: LayoutNode;
+  node: LayoutElement;
   selectedId: string | null;
   assetUrls: Record<string, string>;
   sampleRow: Record<string, string>;
@@ -136,7 +136,7 @@ function EditorNode({
     (id: string) => (e: KonvaEventObject<DragEvent>) => {
       const x = e.target.x();
       const y = e.target.y();
-      onChange(updateNodeInState(state, id, (n) => ({ ...n, x, y } as LayoutNode)));
+      onChange(updateNodeInState(state, id, (n) => ({ ...n, x, y } as LayoutElement)));
     };
   const transformEnd =
     (id: string) => (e: KonvaEventObject<Event>) => {
@@ -177,35 +177,6 @@ function EditorNode({
       }
     };
 
-  if (node.type === 'group') {
-    return (
-      <KonvaGroup
-        id={node.id}
-        x={node.x}
-        y={node.y}
-        rotation={node.rotation ?? 0}
-        draggable={!isLocked(node)}
-        onClick={() => onSelect(node.id)}
-        onTap={() => onSelect(node.id)}
-        onDragEnd={dragEnd(node.id)}
-      >
-        {node.children.map((c) => (
-          <EditorNode
-            key={c.id}
-            node={c}
-            selectedId={selectedId}
-            assetUrls={assetUrls}
-            sampleRow={sampleRow}
-            setNodeRef={setNodeRef}
-            onSelect={onSelect}
-            onChange={onChange}
-            state={state}
-          />
-        ))}
-      </KonvaGroup>
-    );
-  }
-
   if (node.type === 'rect') {
     return (
       <Rect
@@ -230,25 +201,60 @@ function EditorNode({
 
   if (node.type === 'text') {
     const preview = applyTemplate(node.text, sampleRow);
+    /** Transformer on raw Text jumps (bounds vs align). Attach to a Group at x,y instead. */
+    const dragEndGroup =
+      (id: string) => (e: KonvaEventObject<DragEvent>) => {
+        const g = e.target as Konva.Group;
+        onChange(
+          updateNodeInState(state, id, (n) => ({ ...n, x: g.x(), y: g.y() } as LayoutElement)),
+        );
+      };
+    const transformEndGroup =
+      (id: string) => (e: KonvaEventObject<Event>) => {
+        const g = e.target as Konva.Group;
+        const sx = g.scaleX();
+        const sy = g.scaleY();
+        const rotation = g.rotation();
+        const x = g.x();
+        const y = g.y();
+        g.scaleX(1);
+        g.scaleY(1);
+        const found = findNode(state.root, id);
+        if (!found || found.node.type !== 'text') return;
+        onChange(
+          updateNodeInState(state, id, (el) => {
+            if (el.type !== 'text') return el;
+            const w = Math.round(Math.max(24, (el.width ?? 100) * sx) * 100) / 100;
+            const fs = Math.round(Math.max(8, (el.fontSize ?? 16) * sy) * 100) / 100;
+            return { ...el, x, y, width: w, fontSize: fs, rotation };
+          }),
+        );
+      };
     return (
-      <Text
+      <KonvaGroup
         ref={(r) => setNodeRef(node.id, r)}
         id={node.id}
         x={node.x}
         y={node.y}
-        width={node.width}
-        text={preview}
-        fontSize={node.fontSize ?? 16}
-        fill={node.fill ?? '#f3f4f6'}
-        align={node.align ?? 'left'}
-        wrap="word"
         rotation={node.rotation ?? 0}
         draggable={!isLocked(node)}
         onClick={() => onSelect(node.id)}
         onTap={() => onSelect(node.id)}
-        onDragEnd={dragEnd(node.id)}
-        onTransformEnd={transformEnd(node.id)}
-      />
+        onDragEnd={dragEndGroup(node.id)}
+        onTransformEnd={transformEndGroup(node.id)}
+      >
+        <Text
+          x={0}
+          y={0}
+          width={node.width}
+          text={preview}
+          fontSize={node.fontSize ?? 16}
+          fill={node.fill ?? '#f3f4f6'}
+          align={node.align ?? 'left'}
+          wrap="word"
+          listening
+        />
+      </KonvaGroup>
     );
   }
 
@@ -265,6 +271,8 @@ function EditorNode({
   );
 }
 
+const HISTORY_CAP = 50;
+
 export function LayoutEditor({
   state,
   onChange,
@@ -277,8 +285,69 @@ export function LayoutEditor({
   sampleRow: Record<string, string>;
 }) {
   const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [canUndo, setCanUndo] = useState(false);
+  const [canRedo, setCanRedo] = useState(false);
+  const historyPast = useRef<LayoutStateV2[]>([]);
+  const historyFuture = useRef<LayoutStateV2[]>([]);
+  const canvasFillRef = useRef<HTMLDivElement>(null);
+  const [viewport, setViewport] = useState({ w: 0, h: 0 });
   const trRef = useRef<Konva.Transformer>(null);
   const nodeRefs = useRef<Map<string, Konva.Node>>(new Map());
+
+  const commit = useCallback(
+    (next: LayoutStateV2) => {
+      historyPast.current.push(JSON.parse(JSON.stringify(state)) as LayoutStateV2);
+      if (historyPast.current.length > HISTORY_CAP) historyPast.current.shift();
+      historyFuture.current = [];
+      setCanUndo(true);
+      setCanRedo(false);
+      onChange(next);
+    },
+    [state, onChange],
+  );
+
+  const undo = useCallback(() => {
+    const prev = historyPast.current.pop();
+    if (!prev) return;
+    historyFuture.current.push(JSON.parse(JSON.stringify(state)) as LayoutStateV2);
+    setCanUndo(historyPast.current.length > 0);
+    setCanRedo(true);
+    onChange(prev);
+  }, [state, onChange]);
+
+  const redo = useCallback(() => {
+    const next = historyFuture.current.pop();
+    if (!next) return;
+    historyPast.current.push(JSON.parse(JSON.stringify(state)) as LayoutStateV2);
+    setCanRedo(historyFuture.current.length > 0);
+    setCanUndo(true);
+    onChange(next);
+  }, [state, onChange]);
+
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      const el = e.target as HTMLElement | null;
+      if (el?.closest('input, textarea, select, [contenteditable="true"]')) return;
+      const meta = e.metaKey || e.ctrlKey;
+      if (!meta || e.key.toLowerCase() !== 'z') return;
+      e.preventDefault();
+      if (e.shiftKey) redo();
+      else undo();
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [undo, redo]);
+
+  useLayoutEffect(() => {
+    const el = canvasFillRef.current;
+    if (!el) return;
+    const ro = new ResizeObserver(() => {
+      setViewport({ w: el.clientWidth, h: el.clientHeight });
+    });
+    ro.observe(el);
+    setViewport({ w: el.clientWidth, h: el.clientHeight });
+    return () => ro.disconnect();
+  }, []);
 
   const setNodeRef = useCallback((id: string, node: Konva.Node | null) => {
     if (node) nodeRefs.current.set(id, node);
@@ -295,7 +364,7 @@ export function LayoutEditor({
     if (!tr) return;
     const n = selectedId ? nodeRefs.current.get(selectedId) : null;
     const found = selectedId ? findNode(state.root, selectedId) : null;
-    if (n && found && found.node.type !== 'group' && !isLocked(found.node)) {
+    if (n && found && !isLocked(found.node)) {
       tr.nodes([n]);
     } else {
       tr.nodes([]);
@@ -304,24 +373,30 @@ export function LayoutEditor({
   }, [selectedId, state]);
 
   const updateSelected = useCallback(
-    (patch: Partial<LayoutNode>) => {
+    (patch: Partial<LayoutElement>) => {
       if (!selectedId) return;
-      onChange(
-        updateNodeInState(state, selectedId, (n) => ({ ...n, ...patch } as LayoutNode)),
+      commit(
+        updateNodeInState(state, selectedId, (n) => ({ ...n, ...patch } as LayoutElement)),
       );
     },
-    [selectedId, state, onChange],
+    [selectedId, state, commit],
   );
 
   const bg = state.background ?? '#1e1e24';
-  const maxCanvas = 560;
-  const scale = Math.min(1, maxCanvas / state.width);
+  const pad = 8;
+  const scale =
+    viewport.w > 0 && viewport.h > 0
+      ? Math.min(
+          (viewport.w - pad * 2) / state.width,
+          (viewport.h - pad * 2) / state.height,
+        )
+      : Math.min(1, 480 / state.width);
   const stageW = state.width * scale;
   const stageH = state.height * scale;
   const showGrid = state.showGrid !== false;
 
   const toggleVisible = (id: string) => {
-    onChange(
+    commit(
       updateNodeInState(state, id, (n) => ({
         ...n,
         visible: isVisible(n) ? false : true,
@@ -329,147 +404,101 @@ export function LayoutEditor({
     );
   };
   const toggleLock = (id: string) => {
-    onChange(
+    commit(
       updateNodeInState(state, id, (n) => ({
         ...n,
         locked: isLocked(n) ? false : true,
       })),
     );
   };
-  const toggleCollapse = (id: string) => {
-    onChange(
-      updateNodeInState(state, id, (n) => {
-        if (n.type !== 'group') return n;
-        return { ...n, collapsed: !n.collapsed };
-      }),
-    );
-  };
+
+  const hierarchyToolbar: ZoneHierarchyToolbarProps = useMemo(
+    () => ({
+      onAddText: () => {
+        const id = crypto.randomUUID();
+        const node: LayoutElement = {
+          type: 'text',
+          id,
+          x: 16,
+          y: 40,
+          width: state.width - 32,
+          text: DEFAULT_NEW_TEXT,
+          fontSize: 16,
+          fill: '#f3f4f6',
+          align: 'center',
+          visible: true,
+          locked: false,
+        };
+        commit(applyInsert(state, node, selectedId));
+        setSelectedId(id);
+      },
+      onAddBar: () => {
+        const id = crypto.randomUUID();
+        const node: LayoutElement = {
+          type: 'rect',
+          id,
+          x: 24,
+          y: 80,
+          width: state.width - 48,
+          height: 4,
+          fill: '#4b5563',
+          visible: true,
+          locked: false,
+        };
+        commit(applyInsert(state, node, selectedId));
+        setSelectedId(id);
+      },
+      onAddImage: () => {
+        const id = crypto.randomUUID();
+        const node: LayoutElement = {
+          type: 'image',
+          id,
+          x: 40,
+          y: 100,
+          width: Math.min(120, state.width - 80),
+          height: 120,
+          artKey: 'art',
+          visible: true,
+          locked: false,
+        };
+        commit(applyInsert(state, node, selectedId));
+        setSelectedId(id);
+      },
+      onDuplicate: () => {
+        if (!selectedId) return;
+        const found = findNode(state.root, selectedId);
+        if (!found) return;
+        const dup = cloneWithNewIds(found.node);
+        commit({ ...state, root: insertAfterSiblingDeep(state.root, selectedId, dup) });
+        setSelectedId(dup.id);
+      },
+      onRemove: () => {
+        if (!selectedId) return;
+        commit({ ...state, root: removeNodeById(state.root, selectedId) });
+        setSelectedId(null);
+      },
+      onUndo: () => undo(),
+      onRedo: () => redo(),
+      onToggleGrid: () => commit({ ...state, showGrid: !showGrid }),
+      canUndo,
+      canRedo,
+      showGrid,
+      hasSelection: !!selectedId,
+    }),
+    [
+      state,
+      selectedId,
+      commit,
+      undo,
+      redo,
+      canUndo,
+      canRedo,
+      showGrid,
+    ],
+  );
 
   return (
     <div className="layout-editor">
-      <div className="layout-editor-toolbar">
-        <button
-          type="button"
-          onClick={() => {
-            const id = crypto.randomUUID();
-            const node: LayoutNode = {
-              type: 'text',
-              id,
-              x: 16,
-              y: 40,
-              width: state.width - 32,
-              text: DEFAULT_NEW_TEXT,
-              fontSize: 16,
-              fill: '#f3f4f6',
-              align: 'center',
-              visible: true,
-              locked: false,
-            };
-            onChange(applyInsert(state, node, selectedId));
-            setSelectedId(id);
-          }}
-        >
-          Add text
-        </button>
-        <button
-          type="button"
-          onClick={() => {
-            const id = crypto.randomUUID();
-            const node: LayoutNode = {
-              type: 'rect',
-              id,
-              x: 24,
-              y: 80,
-              width: state.width - 48,
-              height: 4,
-              fill: '#4b5563',
-              visible: true,
-              locked: false,
-            };
-            onChange(applyInsert(state, node, selectedId));
-            setSelectedId(id);
-          }}
-        >
-          Add bar
-        </button>
-        <button
-          type="button"
-          onClick={() => {
-            const id = crypto.randomUUID();
-            const node: LayoutNode = {
-              type: 'image',
-              id,
-              x: 40,
-              y: 100,
-              width: Math.min(120, state.width - 80),
-              height: 120,
-              artKey: 'art',
-              visible: true,
-              locked: false,
-            };
-            onChange(applyInsert(state, node, selectedId));
-            setSelectedId(id);
-          }}
-        >
-          Add image
-        </button>
-        <button
-          type="button"
-          onClick={() => {
-            const id = crypto.randomUUID();
-            const node: LayoutNode = {
-              type: 'group',
-              id,
-              name: 'Group',
-              x: 20,
-              y: 60,
-              visible: true,
-              locked: false,
-              collapsed: false,
-              children: [],
-            };
-            onChange(applyInsert(state, node, selectedId));
-            setSelectedId(id);
-          }}
-        >
-          Add group
-        </button>
-        <button
-          type="button"
-          onClick={() => {
-            if (!selectedId) return;
-            const found = findNode(state.root, selectedId);
-            if (!found) return;
-            const dup = cloneWithNewIds(found.node);
-            onChange({ ...state, root: insertAfterSiblingDeep(state.root, selectedId, dup) });
-            setSelectedId(dup.id);
-          }}
-          disabled={!selectedId}
-        >
-          Duplicate
-        </button>
-        <button
-          type="button"
-          className="link-danger"
-          disabled={!selectedId}
-          onClick={() => {
-            if (!selectedId) return;
-            onChange({ ...state, root: removeNodeById(state.root, selectedId) });
-            setSelectedId(null);
-          }}
-        >
-          Remove
-        </button>
-        <label className="layout-grid-toggle">
-          <input
-            type="checkbox"
-            checked={showGrid}
-            onChange={() => onChange({ ...state, showGrid: !showGrid })}
-          />
-          Grid
-        </label>
-      </div>
-
       <div className="layout-editor-shell">
         <aside className="layout-editor-props layout-editor-props-left">
           <h3>Properties</h3>
@@ -597,39 +626,6 @@ export function LayoutEditor({
               </label>
             </>
           )}
-          {selected?.type === 'group' && (
-            <>
-              <label>
-                Group name
-                <input
-                  type="text"
-                  value={selected.name}
-                  onChange={(e) => updateSelected({ name: e.target.value })}
-                />
-              </label>
-              <label>
-                X
-                <input
-                  type="number"
-                  value={Math.round(selected.x)}
-                  onChange={(e) =>
-                    updateSelected({ x: Number(e.target.value) || 0 })
-                  }
-                />
-              </label>
-              <label>
-                Y
-                <input
-                  type="number"
-                  value={Math.round(selected.y)}
-                  onChange={(e) =>
-                    updateSelected({ y: Number(e.target.value) || 0 })
-                  }
-                />
-              </label>
-            </>
-          )}
-
           <h3>Card</h3>
           <label>
             Width (px)
@@ -639,7 +635,7 @@ export function LayoutEditor({
               max={2000}
               value={state.width}
               onChange={(e) =>
-                onChange({ ...state, width: Number(e.target.value) || state.width })
+                commit({ ...state, width: Number(e.target.value) || state.width })
               }
             />
           </label>
@@ -651,7 +647,7 @@ export function LayoutEditor({
               max={3000}
               value={state.height}
               onChange={(e) =>
-                onChange({ ...state, height: Number(e.target.value) || state.height })
+                commit({ ...state, height: Number(e.target.value) || state.height })
               }
             />
           </label>
@@ -660,59 +656,82 @@ export function LayoutEditor({
             <input
               type="text"
               value={state.background ?? ''}
-              onChange={(e) => onChange({ ...state, background: e.target.value })}
+              onChange={(e) => commit({ ...state, background: e.target.value })}
             />
           </label>
         </aside>
 
-        <div className="layout-editor-canvas">
-          <div
-            className="layout-editor-stage-wrap"
-            style={{ width: stageW, height: stageH }}
-          >
-            <Stage
-              width={stageW}
-              height={stageH}
-              style={{ background: bg, display: 'block' }}
-              onMouseDown={(e) => {
-                if (e.target === e.target.getStage()) setSelectedId(null);
-              }}
-            >
-            <Layer>
-              <KonvaGroup scaleX={scale} scaleY={scale}>
-                <Rect
-                  width={state.width}
-                  height={state.height}
-                  fill={bg}
-                  onMouseDown={() => setSelectedId(null)}
-                />
-                {showGrid && <GridOverlay w={state.width} h={state.height} step={10} />}
-                {state.root.map((node) => (
-                  <EditorNode
-                    key={node.id}
-                    node={node}
-                    selectedId={selectedId}
-                    assetUrls={assetUrls}
-                    sampleRow={sampleRow}
-                    setNodeRef={setNodeRef}
-                    onSelect={setSelectedId}
-                    onChange={onChange}
-                    state={state}
-                  />
-                ))}
-                <Transformer
-                  ref={trRef}
-                  rotateEnabled
-                  borderStroke="#38bdf8"
-                  borderDash={[4, 4]}
-                  anchorStroke="#f8fafc"
-                  anchorFill="#0ea5e9"
-                  anchorSize={8}
-                  boundBoxFunc={(oldBox, newBox) => newBox}
-                />
-              </KonvaGroup>
-            </Layer>
-          </Stage>
+        <div className="layout-editor-canvas-column">
+          <div className="layout-editor-canvas">
+            <div ref={canvasFillRef} className="layout-editor-canvas-fill">
+              <div
+                className="layout-editor-stage-wrap"
+                style={{
+                  width: stageW,
+                  height: stageH,
+                  position: 'relative',
+                }}
+              >
+                {/*
+                  Scale via CSS, not a scaled Konva Group — nested drags use wrong deltas
+                  when an ancestor has scaleX/scaleY.
+                */}
+                <div
+                  style={{
+                    position: 'absolute',
+                    left: 0,
+                    top: 0,
+                    width: state.width,
+                    height: state.height,
+                    transform: `scale(${scale})`,
+                    transformOrigin: 'top left',
+                  }}
+                >
+                  <Stage
+                    width={state.width}
+                    height={state.height}
+                    style={{ background: bg, display: 'block' }}
+                    onMouseDown={(e) => {
+                      const st = e.target.getStage();
+                      if (e.target === st) setSelectedId(null);
+                    }}
+                  >
+                    <Layer>
+                      <Rect
+                        width={state.width}
+                        height={state.height}
+                        fill={bg}
+                        onMouseDown={() => setSelectedId(null)}
+                      />
+                      {showGrid && <GridOverlay w={state.width} h={state.height} step={10} />}
+                      {state.root.map((node) => (
+                        <EditorNode
+                          key={node.id}
+                          node={node}
+                          selectedId={selectedId}
+                          assetUrls={assetUrls}
+                          sampleRow={sampleRow}
+                          setNodeRef={setNodeRef}
+                          onSelect={setSelectedId}
+                          onChange={commit}
+                          state={state}
+                        />
+                      ))}
+                      <Transformer
+                        ref={trRef}
+                        rotateEnabled
+                        borderStroke="#38bdf8"
+                        borderDash={[4, 4]}
+                        anchorStroke="#f8fafc"
+                        anchorFill="#0ea5e9"
+                        anchorSize={8}
+                        boundBoxFunc={(oldBox, newBox) => newBox}
+                      />
+                    </Layer>
+                  </Stage>
+                </div>
+              </div>
+            </div>
           </div>
         </div>
 
@@ -722,9 +741,9 @@ export function LayoutEditor({
           onSelect={setSelectedId}
           onToggleVisible={toggleVisible}
           onToggleLock={toggleLock}
-          onToggleCollapse={toggleCollapse}
+          toolbar={hierarchyToolbar}
           onMoveNode={(dragId, targetId, placement) =>
-            onChange({ ...state, root: moveNodeInTree(state.root, dragId, targetId, placement) })
+            commit({ ...state, root: moveNodeInFlatList(state.root, dragId, targetId, placement) })
           }
         />
       </div>

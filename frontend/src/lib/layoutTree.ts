@@ -1,253 +1,90 @@
-import type { LayoutNode, LayoutStateV2 } from '../types/layout';
+import type { LayoutElement, LayoutStateV2 } from '../types/layout';
 
 export function updateNodeInState(
   state: LayoutStateV2,
   id: string,
-  fn: (n: LayoutNode) => LayoutNode,
+  fn: (n: LayoutElement) => LayoutElement,
 ): LayoutStateV2 {
-  return { ...state, root: mapNodeById(state.root, id, fn) };
-}
-
-export function mapNodeById(
-  nodes: LayoutNode[],
-  id: string,
-  fn: (n: LayoutNode) => LayoutNode,
-): LayoutNode[] {
-  return nodes.map((n) => {
-    if (n.id === id) return fn(n);
-    if (n.type === 'group') {
-      return { ...n, children: mapNodeById(n.children, id, fn) };
-    }
-    return n;
-  });
-}
-
-export function removeNodeById(nodes: LayoutNode[], id: string): LayoutNode[] {
-  const out: LayoutNode[] = [];
-  for (const n of nodes) {
-    if (n.id === id) continue;
-    if (n.type === 'group') {
-      out.push({ ...n, children: removeNodeById(n.children, id) });
-    } else {
-      out.push(n);
-    }
-  }
-  return out;
+  return { ...state, root: state.root.map((n) => (n.id === id ? fn(n) : n)) };
 }
 
 export function findNode(
-  nodes: LayoutNode[],
+  root: LayoutElement[],
   id: string,
-): { node: LayoutNode; parentList: LayoutNode[]; index: number } | null {
-  for (let i = 0; i < nodes.length; i++) {
-    const n = nodes[i];
-    if (n.id === id) return { node: n, parentList: nodes, index: i };
-    if (n.type === 'group') {
-      const inner = findNode(n.children, id);
-      if (inner) return inner;
-    }
-  }
-  return null;
+): { node: LayoutElement; index: number } | null {
+  const index = root.findIndex((n) => n.id === id);
+  if (index < 0) return null;
+  return { node: root[index], index };
 }
 
-/** Parent list is `nodes` whose direct child has `id`. */
-export function findParentContext(
-  nodes: LayoutNode[],
-  id: string,
-  parentGroupId: 'root' | string = 'root',
-): { parentId: 'root' | string; siblings: LayoutNode[]; index: number } | null {
-  for (let i = 0; i < nodes.length; i++) {
-    if (nodes[i].id === id) {
-      return { parentId: parentGroupId, siblings: nodes, index: i };
-    }
-  }
-  for (const n of nodes) {
-    if (n.type === 'group') {
-      const deeper = findParentContext(n.children, id, n.id);
-      if (deeper) return deeper;
-    }
-  }
-  return null;
+export function removeNodeById(root: LayoutElement[], id: string): LayoutElement[] {
+  return root.filter((n) => n.id !== id);
 }
 
-export function appendNode(
-  root: LayoutNode[],
-  parentId: 'root' | string,
-  child: LayoutNode,
-): LayoutNode[] {
-  if (parentId === 'root') return [...root, child];
-  return mapNodeById(root, parentId, (n) => {
-    if (n.type !== 'group') return n;
-    return { ...n, children: [...n.children, child] };
-  });
-}
-
-/** Insert immediately after `siblingId` within the same sibling array (any depth). */
 export function insertAfterSiblingDeep(
-  root: LayoutNode[],
+  root: LayoutElement[],
   siblingId: string,
-  node: LayoutNode,
-): LayoutNode[] {
-  function rec(list: LayoutNode[]): LayoutNode[] {
-    const idx = list.findIndex((n) => n.id === siblingId);
-    if (idx >= 0) {
-      return [...list.slice(0, idx + 1), node, ...list.slice(idx + 1)];
-    }
-    return list.map((n) =>
-      n.type === 'group' ? { ...n, children: rec(n.children) } : n,
-    );
+  node: LayoutElement,
+): LayoutElement[] {
+  const idx = root.findIndex((n) => n.id === siblingId);
+  if (idx >= 0) {
+    return [...root.slice(0, idx + 1), node, ...root.slice(idx + 1)];
   }
-  return rec(root);
-}
-
-export function moveSibling(root: LayoutNode[], id: string, dir: -1 | 1): LayoutNode[] {
-  function rec(list: LayoutNode[]): LayoutNode[] {
-    const i = list.findIndex((n) => n.id === id);
-    if (i >= 0) {
-      const j = i + dir;
-      if (j < 0 || j >= list.length) return list;
-      const next = [...list];
-      [next[i], next[j]] = [next[j], next[i]];
-      return next;
-    }
-    return list.map((n) =>
-      n.type === 'group' ? { ...n, children: rec(n.children) } : n,
-    );
-  }
-  return rec(root);
-}
-
-/** Remove first matching node (depth-first) and return it + new tree. */
-export function extractNode(
-  nodes: LayoutNode[],
-  id: string,
-): { extracted: LayoutNode | null; rest: LayoutNode[] } {
-  const out: LayoutNode[] = [];
-  let extracted: LayoutNode | null = null;
-  for (const n of nodes) {
-    if (n.id === id) {
-      extracted = n;
-      continue;
-    }
-    if (n.type === 'group') {
-      const inner = extractNode(n.children, id);
-      if (inner.extracted) {
-        extracted = inner.extracted;
-        out.push({ ...n, children: inner.rest });
-      } else {
-        out.push(n);
-      }
-    } else {
-      out.push(n);
-    }
-  }
-  return { extracted, rest: out };
+  return [...root, node];
 }
 
 export function insertBeforeDeep(
-  root: LayoutNode[],
+  root: LayoutElement[],
   targetId: string,
-  node: LayoutNode,
-): LayoutNode[] {
-  function rec(list: LayoutNode[]): LayoutNode[] {
-    const idx = list.findIndex((n) => n.id === targetId);
-    if (idx >= 0) {
-      return [...list.slice(0, idx), node, ...list.slice(idx)];
-    }
-    return list.map((n) =>
-      n.type === 'group' ? { ...n, children: rec(n.children) } : n,
-    );
+  node: LayoutElement,
+): LayoutElement[] {
+  const idx = root.findIndex((n) => n.id === targetId);
+  if (idx >= 0) {
+    return [...root.slice(0, idx), node, ...root.slice(idx)];
   }
-  return rec(root);
+  return [...root, node];
 }
 
-function containsIdDeep(nodes: LayoutNode[], id: string): boolean {
-  for (const n of nodes) {
-    if (n.id === id) return true;
-    if (n.type === 'group' && containsIdDeep(n.children, id)) return true;
-  }
-  return false;
-}
-
-/** True if `maybeDescId` is a strict descendant of the node `ancestorId` (must be a group). */
-export function isDescendantInTree(
-  root: LayoutNode[],
-  ancestorId: string,
-  maybeDescId: string,
-): boolean {
-  if (ancestorId === maybeDescId) return false;
-  const a = findNode(root, ancestorId);
-  if (!a || a.node.type !== 'group') return false;
-  return containsIdDeep(a.node.children, maybeDescId);
-}
-
-export function appendToGroupDeep(
-  root: LayoutNode[],
-  groupId: string,
-  node: LayoutNode,
-): LayoutNode[] {
-  return mapNodeById(root, groupId, (g) => {
-    if (g.type !== 'group') return g;
-    return { ...g, children: [...g.children, node] };
-  });
-}
-
-/** Drag `draggedId` next to or into `targetId` (Dextrous-style hierarchy). */
-export function moveNodeInTree(
-  root: LayoutNode[],
-  draggedId: string,
+/** Reorder a flat root list (no nesting). */
+export function moveNodeInFlatList(
+  root: LayoutElement[],
+  dragId: string,
   targetId: string,
-  placement: 'before' | 'after' | 'into',
-): LayoutNode[] {
-  if (draggedId === targetId) return root;
-  if (isDescendantInTree(root, draggedId, targetId)) return root;
-  const { extracted, rest } = extractNode(root, draggedId);
+  placement: 'before' | 'after',
+): LayoutElement[] {
+  if (dragId === targetId) return root;
+  const extracted = root.find((n) => n.id === dragId);
   if (!extracted) return root;
-  if (placement === 'into') {
-    const t = findNode(rest, targetId)?.node;
-    if (!t || t.type !== 'group') return root;
-    return appendToGroupDeep(rest, targetId, extracted);
-  }
-  if (placement === 'before') {
-    return insertBeforeDeep(rest, targetId, extracted);
-  }
-  return insertAfterSiblingDeep(rest, targetId, extracted);
+  const without = root.filter((n) => n.id !== dragId);
+  const ti = without.findIndex((n) => n.id === targetId);
+  if (ti < 0) return root;
+  const insertAt = placement === 'before' ? ti : ti + 1;
+  return [...without.slice(0, insertAt), extracted, ...without.slice(insertAt)];
 }
 
-export function cloneWithNewIds(node: LayoutNode): LayoutNode {
-  if (node.type === 'group') {
-    return {
-      ...node,
-      id: crypto.randomUUID(),
-      children: node.children.map(cloneWithNewIds),
-    };
-  }
+export function cloneWithNewIds(node: LayoutElement): LayoutElement {
   return { ...node, id: crypto.randomUUID() };
 }
 
-export function isVisible(n: LayoutNode): boolean {
+export function isVisible(n: LayoutElement): boolean {
   return n.visible !== false;
 }
 
-export function isLocked(n: LayoutNode): boolean {
+export function isLocked(n: LayoutElement): boolean {
   return n.locked === true;
 }
 
-/** Add node: into selected group, or after selected leaf, or root. */
 export function applyInsert(
   state: LayoutStateV2,
-  child: LayoutNode,
+  child: LayoutElement,
   selectedId: string | null,
 ): LayoutStateV2 {
   if (!selectedId) {
-    return { ...state, root: appendNode(state.root, 'root', child) };
+    return { ...state, root: [...state.root, child] };
   }
   const found = findNode(state.root, selectedId);
   if (!found) {
-    return { ...state, root: appendNode(state.root, 'root', child) };
-  }
-  if (found.node.type === 'group') {
-    return { ...state, root: appendNode(state.root, found.node.id, child) };
+    return { ...state, root: [...state.root, child] };
   }
   return { ...state, root: insertAfterSiblingDeep(state.root, selectedId, child) };
 }
