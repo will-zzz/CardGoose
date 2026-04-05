@@ -15,6 +15,10 @@ export type LayoutEditorChrome = {
   onEditRedo: () => void;
   onEditSelectAll: () => void;
   onEditClearCanvas: () => void;
+  onViewZoomToFit: () => void;
+  onViewZoomIn: () => void;
+  onViewZoomOut: () => void;
+  onViewZoomTo100Percent: () => void;
   canUndo: boolean;
   canRedo: boolean;
   busy: boolean;

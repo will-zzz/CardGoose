@@ -353,6 +353,10 @@ export type LayoutEditorHandle = {
   redo: () => void;
   selectAll: () => void;
   clearCanvas: () => void;
+  zoomToFit: () => void;
+  zoomIn: () => void;
+  zoomOut: () => void;
+  zoomTo100Percent: () => void;
 };
 
 type LayoutEditorProps = {
@@ -377,6 +381,8 @@ export const LayoutEditor = forwardRef<LayoutEditorHandle, LayoutEditorProps>(fu
   const [viewport, setViewport] = useState({ w: 0, h: 0 });
   /** 100 = fit-to-viewport; wheel/buttons adjust relative to that baseline. */
   const [zoomPercent, setZoomPercent] = useState(100);
+  /** Pan offset (px) after flex centering; two-finger scroll without ⌘/Ctrl. */
+  const [pan, setPan] = useState({ x: 0, y: 0 });
   const trRef = useRef<Konva.Transformer>(null);
   const nodeRefs = useRef<Map<string, Konva.Node>>(new Map());
 
@@ -410,6 +416,23 @@ export const LayoutEditor = forwardRef<LayoutEditorHandle, LayoutEditorProps>(fu
     onChange(next);
   }, [state, onChange]);
 
+  const zoomToFit = useCallback(() => {
+    setPan({ x: 0, y: 0 });
+    setZoomPercent(100);
+  }, []);
+
+  const zoomTo100Percent = useCallback(() => {
+    setZoomPercent(100);
+  }, []);
+
+  const zoomInFromMenu = useCallback(() => {
+    setZoomPercent((p) => clampZoomPercent(p + ZOOM_STEP_FINE));
+  }, []);
+
+  const zoomOutFromMenu = useCallback(() => {
+    setZoomPercent((p) => clampZoomPercent(p - ZOOM_STEP_FINE));
+  }, []);
+
   useImperativeHandle(
     ref,
     () => ({
@@ -424,8 +447,12 @@ export const LayoutEditor = forwardRef<LayoutEditorHandle, LayoutEditorProps>(fu
         commit({ ...state, root: [] });
         setSelectedId(null);
       },
+      zoomToFit,
+      zoomIn: zoomInFromMenu,
+      zoomOut: zoomOutFromMenu,
+      zoomTo100Percent,
     }),
-    [undo, redo, state, commit],
+    [undo, redo, state, commit, zoomToFit, zoomInFromMenu, zoomOutFromMenu, zoomTo100Percent],
   );
 
   useEffect(() => {
@@ -437,14 +464,37 @@ export const LayoutEditor = forwardRef<LayoutEditorHandle, LayoutEditorProps>(fu
       const el = e.target as HTMLElement | null;
       if (el?.closest('input, textarea, select, [contenteditable="true"]')) return;
       const meta = e.metaKey || e.ctrlKey;
-      if (!meta || e.key.toLowerCase() !== 'z') return;
+      if (!meta) return;
+
+      if (e.code === 'Digit0' || e.code === 'Numpad0') {
+        e.preventDefault();
+        zoomToFit();
+        return;
+      }
+      if ((e.code === 'Digit1' || e.code === 'Numpad1') && !e.shiftKey) {
+        e.preventDefault();
+        zoomTo100Percent();
+        return;
+      }
+      if (e.code === 'Minus' || e.code === 'NumpadSubtract') {
+        e.preventDefault();
+        zoomOutFromMenu();
+        return;
+      }
+      if (e.code === 'Equal' || e.code === 'NumpadAdd' || e.key === '+') {
+        e.preventDefault();
+        zoomInFromMenu();
+        return;
+      }
+
+      if (e.key.toLowerCase() !== 'z') return;
       e.preventDefault();
       if (e.shiftKey) redo();
       else undo();
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
-  }, [undo, redo]);
+  }, [undo, redo, zoomToFit, zoomTo100Percent, zoomInFromMenu, zoomOutFromMenu]);
 
   useLayoutEffect(() => {
     const el = canvasFillRef.current;
@@ -461,12 +511,17 @@ export const LayoutEditor = forwardRef<LayoutEditorHandle, LayoutEditorProps>(fu
     const el = canvasFillRef.current;
     if (!el) return;
     const onWheel = (e: WheelEvent) => {
-      if (!e.ctrlKey && !e.metaKey) return;
+      if (e.ctrlKey || e.metaKey) {
+        e.preventDefault();
+        const delta = -e.deltaY;
+        setZoomPercent((p) => clampZoomPercent(p * Math.exp(delta * 0.0018)));
+        return;
+      }
       e.preventDefault();
-      const delta = -e.deltaY;
-      setZoomPercent((p) =>
-        clampZoomPercent(p * Math.exp(delta * 0.0018)),
-      );
+      setPan((p) => ({
+        x: p.x - e.deltaX,
+        y: p.y - e.deltaY,
+      }));
     };
     el.addEventListener('wheel', onWheel, { passive: false });
     return () => el.removeEventListener('wheel', onWheel);
@@ -872,6 +927,12 @@ export const LayoutEditor = forwardRef<LayoutEditorHandle, LayoutEditorProps>(fu
           <div className="layout-editor-canvas">
             <div ref={canvasFillRef} className="layout-editor-canvas-fill">
               <div
+                className="layout-editor-pan-layer"
+                style={{
+                  transform: `translate(${pan.x}px, ${pan.y}px)`,
+                }}
+              >
+              <div
                 className="layout-editor-stage-wrap"
                 style={{
                   width: stageW,
@@ -937,6 +998,7 @@ export const LayoutEditor = forwardRef<LayoutEditorHandle, LayoutEditorProps>(fu
                     </Layer>
                   </Stage>
                 </div>
+              </div>
               </div>
             </div>
           </div>

@@ -1,4 +1,4 @@
-import { useRef, useState, type ReactNode } from 'react';
+import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react';
 import {
   Box,
   CheckCircle2,
@@ -11,6 +11,7 @@ import {
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/useAuth';
 import { useStudioChrome } from '../contexts/StudioChrome';
+import { isMacLike } from '../lib/platform';
 import type { ProjectTab } from '../contexts/studioChromeTypes';
 import {
   DropdownMenu,
@@ -244,11 +245,62 @@ function ProjectLoadingBar() {
   );
 }
 
+function viewShortcutHints() {
+  const mac = isMacLike();
+  return {
+    fit: mac ? '⌘0' : 'Ctrl+0',
+    z100: mac ? '⌘1' : 'Ctrl+1',
+    in: mac ? '⌘+' : 'Ctrl+Plus',
+    out: mac ? '⌘−' : 'Ctrl+Minus',
+  };
+}
+
 function EditorBar() {
   const { layoutEditor } = useStudioChrome();
+  const [fullscreen, setFullscreen] = useState(false);
+
+  useEffect(() => {
+    const syncFs = () => {
+      const doc = document as Document & {
+        webkitFullscreenElement?: Element | null;
+      };
+      setFullscreen(!!(document.fullscreenElement || doc.webkitFullscreenElement));
+    };
+    document.addEventListener('fullscreenchange', syncFs);
+    document.addEventListener('webkitfullscreenchange', syncFs);
+    syncFs();
+    return () => {
+      document.removeEventListener('fullscreenchange', syncFs);
+      document.removeEventListener('webkitfullscreenchange', syncFs);
+    };
+  }, []);
+
+  const toggleFullscreen = useCallback(async () => {
+    try {
+      const doc = document as Document & {
+        webkitExitFullscreen?: () => Promise<void>;
+        webkitFullscreenElement?: Element | null;
+      };
+      if (document.fullscreenElement || doc.webkitFullscreenElement) {
+        if (document.exitFullscreen) await document.exitFullscreen();
+        else if (doc.webkitExitFullscreen) await doc.webkitExitFullscreen();
+        return;
+      }
+      const el = document.documentElement;
+      const hel = el as HTMLElement & {
+        webkitRequestFullscreen?: () => Promise<void>;
+      };
+      if (el.requestFullscreen) await el.requestFullscreen();
+      else if (hel.webkitRequestFullscreen) await hel.webkitRequestFullscreen();
+    } catch {
+      /* user gesture or API unsupported */
+    }
+  }, []);
+
   if (!layoutEditor) return null;
 
   const le = layoutEditor;
+  const vs = viewShortcutHints();
 
   return (
     <header className="studio-shell-header studio-shell-header--editor" role="banner">
@@ -434,6 +486,78 @@ function EditorBar() {
                   disabled={le.busy}
                 >
                   Clear canvas
+                </button>
+              </>
+            )}
+          </AppMenu>
+          <AppMenu label="View">
+            {(close) => (
+              <>
+                <button
+                  type="button"
+                  className="app-menu-option"
+                  role="menuitem"
+                  onClick={() => {
+                    close();
+                    le.onViewZoomToFit();
+                  }}
+                >
+                  <span className="app-menu-option-label">Zoom to Fit</span>
+                  <span className="app-menu-option-shortcut">{vs.fit}</span>
+                </button>
+                <button
+                  type="button"
+                  className="app-menu-option"
+                  role="menuitem"
+                  onClick={() => {
+                    close();
+                    le.onViewZoomIn();
+                  }}
+                >
+                  <span className="app-menu-option-label">Zoom In</span>
+                  <span className="app-menu-option-shortcut">{vs.in}</span>
+                </button>
+                <button
+                  type="button"
+                  className="app-menu-option"
+                  role="menuitem"
+                  onClick={() => {
+                    close();
+                    le.onViewZoomOut();
+                  }}
+                >
+                  <span className="app-menu-option-label">Zoom Out</span>
+                  <span className="app-menu-option-shortcut">{vs.out}</span>
+                </button>
+                <button
+                  type="button"
+                  className="app-menu-option"
+                  role="menuitem"
+                  onClick={() => {
+                    close();
+                    le.onViewZoomTo100Percent();
+                  }}
+                >
+                  <span className="app-menu-option-label">Zoom to 100%</span>
+                  <span className="app-menu-option-shortcut">{vs.z100}</span>
+                </button>
+                <div className="app-menu-sep" role="separator" aria-hidden />
+                <button
+                  type="button"
+                  className="app-menu-option"
+                  role="menuitem"
+                  title={fullscreen ? 'Press Esc to exit fullscreen' : undefined}
+                  onClick={() => {
+                    close();
+                    void toggleFullscreen();
+                  }}
+                >
+                  <span className="app-menu-option-label">
+                    {fullscreen ? 'Exit Fullscreen' : 'Enter Fullscreen'}
+                  </span>
+                  <span className="app-menu-option-shortcut">
+                    {fullscreen ? 'Esc' : isMacLike() ? '⌃⌘F' : 'F11'}
+                  </span>
                 </button>
               </>
             )}

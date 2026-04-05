@@ -482,6 +482,10 @@ export function ProjectPage() {
       onEditRedo: () => layoutEditorRef.current?.redo(),
       onEditSelectAll: () => layoutEditorRef.current?.selectAll(),
       onEditClearCanvas: () => layoutEditorRef.current?.clearCanvas(),
+      onViewZoomToFit: () => layoutEditorRef.current?.zoomToFit(),
+      onViewZoomIn: () => layoutEditorRef.current?.zoomIn(),
+      onViewZoomOut: () => layoutEditorRef.current?.zoomOut(),
+      onViewZoomTo100Percent: () => layoutEditorRef.current?.zoomTo100Percent(),
       canUndo: editorCaps.canUndo,
       canRedo: editorCaps.canRedo,
       onSaveAndExit: () => {
