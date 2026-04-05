@@ -35,7 +35,7 @@ Use this for day-to-day work: **Vite, the API, and the worker all run on your ma
 
 **1. One-time / occasional Terraform** ([`infra/envs/prod`](infra/envs/prod)):
 
-- Set `rds_dev_access_cidr` in `terraform.tfvars` to your public IP as `/32` (e.g. from `curl -s https://checkip.amazonaws.com`). Update it if your ISP changes your IP.
+- Set `rds_dev_access_cidrs` in `terraform.tfvars` to one or more public IPs as `/32` (e.g. from `curl -s https://checkip.amazonaws.com`)—for example home and school Wi‑Fi. Update entries when your IP changes.
 - Set `ecs_desired_count = 0` so Fargate tasks are not running (avoids paying for idle services and avoids a second consumer on the same SQS queue while you run the worker locally).
 - Run `terraform apply`.
 
@@ -69,19 +69,18 @@ pnpm dev:frontend
 Open the URL Vite prints (often `http://localhost:5173`).
 
 ```bash
-# Terminal 3 — worker (values must match .env.local)
+# Terminal 3 — worker (reads S3_BUCKET_EXPORTS, SQS_QUEUE_URL, AWS_REGION, etc. from repo `.env.local`)
 cd worker
-AWS_REGION=us-east-1 \
-S3_BUCKET_EXPORTS=<same as S3_BUCKET_EXPORTS in .env.local> \
-SQS_QUEUE_URL=<same as SQS_QUEUE_URL in .env.local> \
-LOG_LEVEL=INFO \
-PYTHONPATH=src \
-python3 -m baker.main
+PYTHONPATH=src python3 -m baker.main
 ```
+
+Variables already set in your shell override `.env.local`. Set `LOG_LEVEL=DEBUG` (or another level) in `.env.local` or prefix the command if you want more verbose worker logs.
 
 **What is local vs cloud:** the browser, Vite, Node API, and Python worker are **local**. RDS, S3, and SQS are **AWS**. The API talks to RDS, S3, and SQS; the worker polls SQS and writes export artifacts to S3.
 
 **Smoke test:** register, create a project, upload a file, **Trigger export**. With the worker running, the export list should show a JSON result after a few seconds.
+
+**If Prisma cannot reach RDS** (`Can't reach database server at …rds.amazonaws.com`): add your current public IP as a `/32` entry in `rds_dev_access_cidrs` in `infra/envs/prod/terraform.tfvars`, run `terraform apply`, and confirm `DATABASE_URL` in `.env.local` matches `terraform output -raw rds_endpoint`.
 
 ## Local development (Docker + LocalStack)
 
@@ -102,7 +101,7 @@ Then follow [`.env.local.example`](.env.local.example) for `DATABASE_URL` pointi
 | [`.env.local.example`](.env.local.example) | Template for **local** dev — copy to **`.env.local`** at the repo root. |
 | [`.env.production.example`](.env.production.example) | Template for **AWS** — copy to **`.env.production`** for Prisma against RDS or tooling (never commit). |
 
-The API loads **`.env.local`** in development (`NODE_ENV !== production`). Prisma CLI uses `dotenv -e ../.env.local` (or `../.env.production` via `pnpm migrate:deploy:prod`).
+The API loads **`.env.local`** in development (`NODE_ENV !== production`). Prisma CLI uses `dotenv -e ../.env.local` (or `../.env.production` via `pnpm migrate:deploy:prod`). The Baker worker loads the same **`.env.local`** at the repo root when you run it locally (via `python-dotenv`; variables already in the environment still win).
 
 If you still have a single **`.env`** from an older setup, rename it to **`.env.local`** (or merge into `.env.local` and delete `.env`).
 

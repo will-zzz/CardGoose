@@ -34,9 +34,9 @@ variable "ecs_desired_count" {
   default     = 1
 }
 
-variable "rds_dev_access_cidr" {
-  description = "Your public IP as /32 (e.g. output of curl -s https://checkip.amazonaws.com plus /32) so local Node can reach prod RDS. Empty = RDS stays private (ECS only)."
-  type        = string
-  default     = ""
+variable "rds_dev_access_cidrs" {
+  description = "One or more public IPs as /32 (curl -s https://checkip.amazonaws.com) so local Prisma can reach prod RDS—e.g. home and school Wi‑Fi. Empty = RDS stays private (ECS only)."
+  type        = list(string)
+  default     = []
   sensitive   = false
 }

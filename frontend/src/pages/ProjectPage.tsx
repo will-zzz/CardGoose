@@ -1,6 +1,11 @@
-import { useCallback, useEffect, useMemo, useState, type FormEvent } from 'react';
-import { CheckCircle2, CircleAlert, Loader2 } from 'lucide-react';
-import { Link, useNavigate, useParams } from 'react-router-dom';
+import {
+  useCallback,
+  useEffect,
+  useMemo,
+  useState,
+  type FormEvent,
+} from 'react';
+import { useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import { apiBase, apiJson } from '../lib/api';
 import { useAuth } from '../contexts/useAuth';
 import { parseCsvText } from '../lib/csv';
@@ -11,6 +16,7 @@ import {
   ensureLayoutState,
   type LayoutStateV2,
 } from '../types/layout';
+import { useStudioChrome } from '../contexts/StudioChrome';
 
 function cloneLayoutState(s: LayoutStateV2): LayoutStateV2 {
   return JSON.parse(JSON.stringify(s)) as LayoutStateV2;
@@ -33,6 +39,8 @@ type Tab = 'data' | 'layout' | 'cards' | 'pipeline';
 export function ProjectPage() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
+  const [searchParams, setSearchParams] = useSearchParams();
+  const { setLayoutEditorChrome, setProjectHint } = useStudioChrome();
   const { token } = useAuth();
   const [tab, setTab] = useState<Tab>('cards');
   const [project, setProject] = useState<ProjectDetail | null>(null);
@@ -109,6 +117,21 @@ export function ProjectPage() {
   }, [loadCore]);
 
   useEffect(() => {
+    if (!id) return;
+    setProjectHint({
+      projectId: id,
+      hasPublishedSheet: Boolean(project?.csvSourceUrl?.trim()),
+    });
+  }, [id, project?.csvSourceUrl, setProjectHint]);
+
+  useEffect(
+    () => () => {
+      setProjectHint(null);
+    },
+    [setProjectHint],
+  );
+
+  useEffect(() => {
     if (tab === 'layout') {
       document.body.classList.add('layout-editor-open');
       return () => document.body.classList.remove('layout-editor-open');
@@ -171,13 +194,16 @@ export function ProjectPage() {
   }, [savedBaseline, layoutName, editorState]);
 
   /** BrowserRouter does not support useBlocker; guard navigation manually. */
-  function onNavigateHomeClick(e: React.MouseEvent<HTMLAnchorElement>) {
-    if (!layoutIsDirty) return;
-    e.preventDefault();
-    if (window.confirm('You have unsaved changes. Leave without saving?')) {
-      navigate('/');
-    }
-  }
+  const onNavigateHomeClick = useCallback(
+    (e: React.MouseEvent<HTMLAnchorElement>) => {
+      if (!layoutIsDirty) return;
+      e.preventDefault();
+      if (window.confirm('You have unsaved changes. Leave without saving?')) {
+        navigate('/');
+      }
+    },
+    [layoutIsDirty, navigate],
+  );
 
   useEffect(() => {
     if (tab !== 'layout' || !layoutIsDirty) return;
@@ -200,24 +226,39 @@ export function ProjectPage() {
     return () => window.removeEventListener('keydown', onKey);
   }, [tab, saveLayout]);
 
-  function exitLayoutEditor() {
+  const navigateTab = useCallback(
+    (next: Tab) => {
+      setTab(next);
+      setSearchParams({ tab: next }, { replace: true });
+    },
+    [setSearchParams],
+  );
+
+  useEffect(() => {
+    const t = searchParams.get('tab');
+    if (t === 'cards' || t === 'layout' || t === 'data' || t === 'pipeline') {
+      setTab(t);
+    }
+  }, [searchParams]);
+
+  const exitLayoutEditor = useCallback(() => {
     if (layoutIsDirty) {
       const ok = window.confirm(
         'You have unsaved changes. Leave the editor without saving?',
       );
       if (!ok) return;
     }
-    setTab('cards');
-  }
+    navigateTab('cards');
+  }, [layoutIsDirty, navigateTab]);
 
-  async function saveLayoutAndExit() {
+  const saveLayoutAndExit = useCallback(async () => {
     if (!layoutIsDirty) {
-      setTab('cards');
+      navigateTab('cards');
       return;
     }
     const ok = await saveLayout();
-    if (ok) setTab('cards');
-  }
+    if (ok) navigateTab('cards');
+  }, [layoutIsDirty, saveLayout, navigateTab]);
 
   async function importCsv(e: FormEvent) {
     e.preventDefault();
@@ -335,7 +376,7 @@ export function ProjectPage() {
     }
   }
 
-  async function onExport() {
+  const onExport = useCallback(async () => {
     if (!token || !id) return;
     setBusy(true);
     setError(null);
@@ -348,7 +389,52 @@ export function ProjectPage() {
     } finally {
       setBusy(false);
     }
-  }
+  }, [token, id, loadPipeline]);
+
+  useEffect(() => {
+    if (!id || tab !== 'layout') {
+      setLayoutEditorChrome(null);
+      return;
+    }
+    setLayoutEditorChrome({
+      projectId: id,
+      layoutName,
+      onLayoutNameChange: setLayoutName,
+      onSave: () => {
+        void saveLayout();
+      },
+      onSaveAndExit: () => {
+        void saveLayoutAndExit();
+      },
+      onExit: exitLayoutEditor,
+      onExport: () => {
+        void onExport();
+      },
+      onNavigateHomeClick,
+      dataTabHref: `/projects/${id}?tab=data`,
+      hasPublishedSheet: Boolean(project?.csvSourceUrl?.trim()),
+      busy,
+      layoutIsDirty,
+      lastSavedAt,
+      saveDisabled: !activeLayoutId,
+    });
+    return () => setLayoutEditorChrome(null);
+  }, [
+    id,
+    tab,
+    layoutName,
+    busy,
+    layoutIsDirty,
+    lastSavedAt,
+    activeLayoutId,
+    project?.csvSourceUrl,
+    setLayoutEditorChrome,
+    saveLayout,
+    saveLayoutAndExit,
+    exitLayoutEditor,
+    onExport,
+    onNavigateHomeClick,
+  ]);
 
   if (!id) return <p>Invalid project</p>;
 
@@ -361,13 +447,6 @@ export function ProjectPage() {
     >
       {tab !== 'layout' && (
         <>
-          <div className="page-header">
-            <p style={{ margin: 0, width: '100%' }}>
-              <Link to="/" onClick={onNavigateHomeClick}>
-                ← Projects
-              </Link>
-            </p>
-          </div>
           <h1>{project?.name ?? 'Project'}</h1>
           <p className="muted">ID: {id}</p>
         </>
@@ -376,16 +455,32 @@ export function ProjectPage() {
 
       {tab !== 'layout' && (
         <div className="tabs" role="tablist" aria-label="Project sections">
-          <button type="button" className={tab === 'cards' ? 'active' : ''} onClick={() => setTab('cards')}>
+          <button
+            type="button"
+            className={tab === 'cards' ? 'active' : ''}
+            onClick={() => navigateTab('cards')}
+          >
             Cards
           </button>
-          <button type="button" className={tab === 'layout' ? 'active' : ''} onClick={() => setTab('layout')}>
+          <button
+            type="button"
+            className={tab === 'layout' ? 'active' : ''}
+            onClick={() => navigateTab('layout')}
+          >
             Layout
           </button>
-          <button type="button" className={tab === 'data' ? 'active' : ''} onClick={() => setTab('data')}>
+          <button
+            type="button"
+            className={tab === 'data' ? 'active' : ''}
+            onClick={() => navigateTab('data')}
+          >
             Data
           </button>
-          <button type="button" className={tab === 'pipeline' ? 'active' : ''} onClick={() => setTab('pipeline')}>
+          <button
+            type="button"
+            className={tab === 'pipeline' ? 'active' : ''}
+            onClick={() => navigateTab('pipeline')}
+          >
             Assets & export
           </button>
         </div>
@@ -445,95 +540,13 @@ export function ProjectPage() {
 
       {tab === 'layout' && (
         <section className="layout-fullscreen" aria-label="Card layout editor">
-          <header className="layout-fullscreen-header">
-            <div className="layout-fullscreen-header-start">
-              <Link to="/" className="layout-fullscreen-link" onClick={onNavigateHomeClick}>
-                ← Projects
-              </Link>
-              <button
-                type="button"
-                className="layout-fullscreen-ghost-btn"
-                onClick={exitLayoutEditor}
-              >
-                Exit editor
-              </button>
-              <button
-                type="button"
-                className="layout-fullscreen-primary-btn"
-                onClick={() => void saveLayoutAndExit()}
-                disabled={busy || !activeLayoutId}
-              >
-                Save &amp; exit
-              </button>
-            </div>
-            {layoutsFull.length > 0 && (
-              <div className="layout-fullscreen-header-meta">
-                <div className="layout-fullscreen-inline-field">
-                  <span className="layout-fullscreen-inline-label" id="layout-name-label">
-                    Name
-                  </span>
-                  <input
-                    type="text"
-                    className="layout-fullscreen-name-input"
-                    value={layoutName}
-                    onChange={(e) => setLayoutName(e.target.value)}
-                    placeholder="Layout name"
-                    disabled={busy}
-                    aria-labelledby="layout-name-label"
-                  />
-                </div>
-                <button
-                  type="button"
-                  className="layout-fullscreen-primary-btn"
-                  onClick={() => void saveLayout()}
-                  disabled={busy || !activeLayoutId}
-                  title="Save (⌘S / Ctrl+S)"
-                >
-                  Save
-                </button>
-                <div
-                  className={`layout-save-status${layoutIsDirty ? ' layout-save-status--dirty' : ''}`}
-                  role="status"
-                  aria-live="polite"
-                >
-                  {busy ? (
-                    <>
-                      <Loader2
-                        className="layout-save-status-svg layout-save-status-spin"
-                        aria-hidden
-                      />
-                      Saving…
-                    </>
-                  ) : layoutIsDirty ? (
-                    <>
-                      <CircleAlert className="layout-save-status-svg" aria-hidden />
-                      Unsaved changes
-                    </>
-                  ) : (
-                    <>
-                      <CheckCircle2 className="layout-save-status-svg" aria-hidden />
-                      All changes saved
-                      {lastSavedAt && (
-                        <span className="layout-save-status-time">
-                          {' · '}
-                          {lastSavedAt.toLocaleTimeString(undefined, {
-                            hour: 'numeric',
-                            minute: '2-digit',
-                          })}
-                        </span>
-                      )}
-                    </>
-                  )}
-                </div>
-              </div>
-            )}
-          </header>
           {activeLayout && (
             <LayoutEditor
               state={editorState}
               onChange={setEditorState}
               assetUrls={assetUrls}
               sampleRow={sampleRow}
+              deckRows={csvData?.rows ?? []}
             />
           )}
         </section>

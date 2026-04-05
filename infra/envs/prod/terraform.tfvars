@@ -7,5 +7,8 @@ project_name = "cardboardforge"
 # Hybrid dev: local API + Prisma reach RDS; scale ECS to 0 so local worker owns SQS.
 ecs_desired_count = 0
 
-# Your public IP (/32). Update if your ISP changes IP. curl -s https://checkip.amazonaws.com
-rds_dev_access_cidr = "98.26.44.239/32"
+# Public IPs as /32 so local Prisma can reach RDS (add home, school, etc.). curl -s https://checkip.amazonaws.com
+rds_dev_access_cidrs = [
+  "98.26.44.239/32", # home
+  "152.3.43.55/32",  # school / other — change if your IP changes
+]

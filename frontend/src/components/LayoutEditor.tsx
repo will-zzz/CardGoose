@@ -15,6 +15,7 @@ import {
 import type { LayoutElement, LayoutStateV2 } from '../types/layout';
 import { DEFAULT_NEW_TEXT } from '../types/layout';
 import { applyTemplate } from '../lib/template';
+import { CardFace } from './CardFace';
 import { useImageElement } from './useImageElement';
 import { ZoneHierarchy, type ZoneHierarchyToolbarProps } from './ZoneHierarchy';
 import {
@@ -56,6 +57,92 @@ function GridOverlay({ w, h, step }: { w: number; h: number; step: number }) {
   return <>{lines}</>;
 }
 
+function TextEditorBlock({
+  node,
+  sampleRow,
+  sel,
+  setNodeRef,
+  onSelect,
+  onChange,
+  state,
+}: {
+  node: Extract<LayoutElement, { type: 'text' }>;
+  sampleRow: Record<string, string>;
+  sel: boolean;
+  setNodeRef: (id: string, node: Konva.Node | null) => void;
+  onSelect: (id: string) => void;
+  onChange: (s: LayoutStateV2) => void;
+  state: LayoutStateV2;
+}) {
+  const [tick, setTick] = useState(0);
+  useEffect(() => {
+    if (!sel) return;
+    const id = setInterval(() => setTick((t) => t + 1), 100);
+    return () => clearInterval(id);
+  }, [sel]);
+  const preview = applyTemplate(node.text, sampleRow);
+  const shadowBlur = sel ? 8 + Math.sin(tick * 0.35) * 6 : 0;
+
+  const dragEndGroup =
+    (id: string) => (e: KonvaEventObject<DragEvent>) => {
+      const g = e.target as Konva.Group;
+      onChange(
+        updateNodeInState(state, id, (n) => ({ ...n, x: g.x(), y: g.y() } as LayoutElement)),
+      );
+    };
+  const transformEndGroup =
+    (id: string) => (e: KonvaEventObject<Event>) => {
+      const g = e.target as Konva.Group;
+      const sx = g.scaleX();
+      const sy = g.scaleY();
+      const rotation = g.rotation();
+      const x = g.x();
+      const y = g.y();
+      g.scaleX(1);
+      g.scaleY(1);
+      const found = findNode(state.root, id);
+      if (!found || found.node.type !== 'text') return;
+      onChange(
+        updateNodeInState(state, id, (el) => {
+          if (el.type !== 'text') return el;
+          const w = Math.round(Math.max(24, (el.width ?? 100) * sx) * 100) / 100;
+          const fs = Math.round(Math.max(8, (el.fontSize ?? 16) * sy) * 100) / 100;
+          return { ...el, x, y, width: w, fontSize: fs, rotation };
+        }),
+      );
+    };
+
+  return (
+    <KonvaGroup
+      ref={(r) => setNodeRef(node.id, r)}
+      id={node.id}
+      x={node.x}
+      y={node.y}
+      rotation={node.rotation ?? 0}
+      draggable={!isLocked(node)}
+      onClick={() => onSelect(node.id)}
+      onTap={() => onSelect(node.id)}
+      onDragEnd={dragEndGroup(node.id)}
+      onTransformEnd={transformEndGroup(node.id)}
+    >
+      <Text
+        x={0}
+        y={0}
+        width={node.width}
+        text={preview}
+        fontSize={node.fontSize ?? 16}
+        fill={node.fill ?? '#f3f4f6'}
+        align={node.align ?? 'left'}
+        wrap="word"
+        listening
+        shadowBlur={shadowBlur}
+        shadowColor="#10b981"
+        shadowOpacity={sel ? 0.72 : 0}
+      />
+    </KonvaGroup>
+  );
+}
+
 function ImageShape({
   el,
   assetUrls,
@@ -94,7 +181,7 @@ function ImageShape({
         ref={(r) => setNodeRef(el.id, r)}
         {...common}
         fill="#2a2a32"
-        stroke={selected ? '#38bdf8' : '#555'}
+        stroke={selected ? '#10b981' : '#555'}
         strokeWidth={selected ? 2 : 1}
       />
     );
@@ -104,7 +191,7 @@ function ImageShape({
       ref={(r) => setNodeRef(el.id, r)}
       {...common}
       image={img}
-      stroke={selected ? '#38bdf8' : undefined}
+      stroke={selected ? '#10b981' : undefined}
       strokeWidth={selected ? 2 : 0}
     />
   );
@@ -200,61 +287,16 @@ function EditorNode({
   }
 
   if (node.type === 'text') {
-    const preview = applyTemplate(node.text, sampleRow);
-    /** Transformer on raw Text jumps (bounds vs align). Attach to a Group at x,y instead. */
-    const dragEndGroup =
-      (id: string) => (e: KonvaEventObject<DragEvent>) => {
-        const g = e.target as Konva.Group;
-        onChange(
-          updateNodeInState(state, id, (n) => ({ ...n, x: g.x(), y: g.y() } as LayoutElement)),
-        );
-      };
-    const transformEndGroup =
-      (id: string) => (e: KonvaEventObject<Event>) => {
-        const g = e.target as Konva.Group;
-        const sx = g.scaleX();
-        const sy = g.scaleY();
-        const rotation = g.rotation();
-        const x = g.x();
-        const y = g.y();
-        g.scaleX(1);
-        g.scaleY(1);
-        const found = findNode(state.root, id);
-        if (!found || found.node.type !== 'text') return;
-        onChange(
-          updateNodeInState(state, id, (el) => {
-            if (el.type !== 'text') return el;
-            const w = Math.round(Math.max(24, (el.width ?? 100) * sx) * 100) / 100;
-            const fs = Math.round(Math.max(8, (el.fontSize ?? 16) * sy) * 100) / 100;
-            return { ...el, x, y, width: w, fontSize: fs, rotation };
-          }),
-        );
-      };
     return (
-      <KonvaGroup
-        ref={(r) => setNodeRef(node.id, r)}
-        id={node.id}
-        x={node.x}
-        y={node.y}
-        rotation={node.rotation ?? 0}
-        draggable={!isLocked(node)}
-        onClick={() => onSelect(node.id)}
-        onTap={() => onSelect(node.id)}
-        onDragEnd={dragEndGroup(node.id)}
-        onTransformEnd={transformEndGroup(node.id)}
-      >
-        <Text
-          x={0}
-          y={0}
-          width={node.width}
-          text={preview}
-          fontSize={node.fontSize ?? 16}
-          fill={node.fill ?? '#f3f4f6'}
-          align={node.align ?? 'left'}
-          wrap="word"
-          listening
-        />
-      </KonvaGroup>
+      <TextEditorBlock
+        node={node}
+        sampleRow={sampleRow}
+        sel={sel}
+        setNodeRef={setNodeRef}
+        onSelect={onSelect}
+        onChange={onChange}
+        state={state}
+      />
     );
   }
 
@@ -273,16 +315,29 @@ function EditorNode({
 
 const HISTORY_CAP = 50;
 
+function propsInspectorTitle(node: LayoutElement | null): string {
+  if (!node) return 'Nothing selected';
+  if (node.type === 'text') {
+    const t = node.text ?? '';
+    return t.length > 36 ? `${t.slice(0, 36)}…` : t || 'Text';
+  }
+  if (node.type === 'image') return node.artKey || 'Image';
+  return 'Shape';
+}
+
 export function LayoutEditor({
   state,
   onChange,
   assetUrls,
   sampleRow,
+  deckRows = [],
 }: {
   state: LayoutStateV2;
   onChange: (next: LayoutStateV2) => void;
   assetUrls: Record<string, string>;
   sampleRow: Record<string, string>;
+  /** Rows used for the bottom deck filmstrip; empty uses a single placeholder row */
+  deckRows?: Record<string, string>[];
 }) {
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [canUndo, setCanUndo] = useState(false);
@@ -497,173 +552,214 @@ export function LayoutEditor({
     ],
   );
 
+  const filmstripRows = deckRows.length > 0 ? deckRows : [{}];
+
   return (
     <div className="layout-editor">
       <div className="layout-editor-shell">
         <aside className="layout-editor-props layout-editor-props-left">
-          <h3>Properties</h3>
+          <p className="props-panel-title">
+            Properties: <span className="props-panel-title-strong">{propsInspectorTitle(selected)}</span>
+          </p>
           {!selected && (
-            <p className="muted">
+            <p className="muted props-panel-intro">
               Select a zone on the canvas or in the hierarchy. Text supports {'{{Column}}'} tokens.
             </p>
           )}
           {selected?.type === 'text' && (
             <>
-              <label>
-                Text template
-                <textarea
-                  rows={4}
-                  placeholder="Card Name or {{ColumnHeader}}"
-                  value={selected.text}
-                  onChange={(e) => updateSelected({ text: e.target.value })}
-                />
-              </label>
-              <label>
-                Font size
-                <input
-                  type="number"
-                  min={8}
-                  max={72}
-                  step={1}
-                  value={Math.round(selected.fontSize ?? 16)}
-                  onChange={(e) =>
-                    updateSelected({ fontSize: Math.round(Number(e.target.value) || 16) })
-                  }
-                />
-              </label>
-              <label>
-                Color
-                <input
-                  type="text"
-                  value={selected.fill ?? '#f3f4f6'}
-                  onChange={(e) => updateSelected({ fill: e.target.value })}
-                />
-              </label>
-              <label>
-                Align
-                <select
-                  value={selected.align ?? 'left'}
-                  onChange={(e) =>
-                    updateSelected({
-                      align: e.target.value as 'left' | 'center' | 'right',
-                    })
-                  }
-                >
-                  <option value="left">Left</option>
-                  <option value="center">Center</option>
-                  <option value="right">Right</option>
-                </select>
-              </label>
+              <details className="props-accordion" open>
+                <summary>Text</summary>
+                <div className="props-accordion-body">
+                  <label>
+                    Template
+                    <textarea
+                      rows={4}
+                      placeholder="Card Name or {{ColumnHeader}}"
+                      value={selected.text}
+                      onChange={(e) => updateSelected({ text: e.target.value })}
+                    />
+                  </label>
+                </div>
+              </details>
+              <details className="props-accordion" open>
+                <summary>Typography</summary>
+                <div className="props-accordion-body">
+                  <label>
+                    Font size
+                    <input
+                      type="number"
+                      min={8}
+                      max={72}
+                      step={1}
+                      value={Math.round(selected.fontSize ?? 16)}
+                      onChange={(e) =>
+                        updateSelected({ fontSize: Math.round(Number(e.target.value) || 16) })
+                      }
+                    />
+                  </label>
+                  <label>
+                    Color
+                    <input
+                      type="text"
+                      value={selected.fill ?? '#f3f4f6'}
+                      onChange={(e) => updateSelected({ fill: e.target.value })}
+                    />
+                  </label>
+                  <label>
+                    Align
+                    <select
+                      value={selected.align ?? 'left'}
+                      onChange={(e) =>
+                        updateSelected({
+                          align: e.target.value as 'left' | 'center' | 'right',
+                        })
+                      }
+                    >
+                      <option value="left">Left</option>
+                      <option value="center">Center</option>
+                      <option value="right">Right</option>
+                    </select>
+                  </label>
+                </div>
+              </details>
             </>
           )}
           {selected?.type === 'image' && (
             <>
-              <label>
-                Art key
-                <input
-                  type="text"
-                  value={selected.artKey}
-                  onChange={(e) =>
-                    updateSelected({ artKey: e.target.value.trim() || 'art' })
-                  }
-                />
-              </label>
-              <label>
-                Width
-                <input
-                  type="number"
-                  min={8}
-                  value={Math.round(selected.width)}
-                  onChange={(e) =>
-                    updateSelected({ width: Number(e.target.value) || 8 })
-                  }
-                />
-              </label>
-              <label>
-                Height
-                <input
-                  type="number"
-                  min={8}
-                  value={Math.round(selected.height)}
-                  onChange={(e) =>
-                    updateSelected({ height: Number(e.target.value) || 8 })
-                  }
-                />
-              </label>
+              <details className="props-accordion" open>
+                <summary>Image</summary>
+                <div className="props-accordion-body">
+                  <label>
+                    Art key
+                    <input
+                      type="text"
+                      value={selected.artKey}
+                      onChange={(e) =>
+                        updateSelected({ artKey: e.target.value.trim() || 'art' })
+                      }
+                    />
+                  </label>
+                </div>
+              </details>
+              <details className="props-accordion" open>
+                <summary>Geometry</summary>
+                <div className="props-accordion-body">
+                  <label>
+                    Width
+                    <input
+                      type="number"
+                      min={8}
+                      value={Math.round(selected.width)}
+                      onChange={(e) =>
+                        updateSelected({ width: Number(e.target.value) || 8 })
+                      }
+                    />
+                  </label>
+                  <label>
+                    Height
+                    <input
+                      type="number"
+                      min={8}
+                      value={Math.round(selected.height)}
+                      onChange={(e) =>
+                        updateSelected({ height: Number(e.target.value) || 8 })
+                      }
+                    />
+                  </label>
+                </div>
+              </details>
             </>
           )}
           {selected?.type === 'rect' && (
             <>
-              <label>
-                Fill
-                <input
-                  type="text"
-                  value={selected.fill ?? ''}
-                  onChange={(e) => updateSelected({ fill: e.target.value })}
-                />
-              </label>
-              <label>
-                Width
-                <input
-                  type="number"
-                  min={1}
-                  value={Math.round(selected.width)}
-                  onChange={(e) =>
-                    updateSelected({ width: Number(e.target.value) || 1 })
-                  }
-                />
-              </label>
-              <label>
-                Height
-                <input
-                  type="number"
-                  min={1}
-                  value={Math.round(selected.height)}
-                  onChange={(e) =>
-                    updateSelected({ height: Number(e.target.value) || 1 })
-                  }
-                />
-              </label>
+              <details className="props-accordion" open>
+                <summary>Fill</summary>
+                <div className="props-accordion-body">
+                  <label>
+                    Color
+                    <input
+                      type="text"
+                      value={selected.fill ?? ''}
+                      onChange={(e) => updateSelected({ fill: e.target.value })}
+                    />
+                  </label>
+                </div>
+              </details>
+              <details className="props-accordion" open>
+                <summary>Geometry</summary>
+                <div className="props-accordion-body">
+                  <label>
+                    Width
+                    <input
+                      type="number"
+                      min={1}
+                      value={Math.round(selected.width)}
+                      onChange={(e) =>
+                        updateSelected({ width: Number(e.target.value) || 1 })
+                      }
+                    />
+                  </label>
+                  <label>
+                    Height
+                    <input
+                      type="number"
+                      min={1}
+                      value={Math.round(selected.height)}
+                      onChange={(e) =>
+                        updateSelected({ height: Number(e.target.value) || 1 })
+                      }
+                    />
+                  </label>
+                </div>
+              </details>
             </>
           )}
-          <h3>Card</h3>
-          <label>
-            Width (px)
-            <input
-              type="number"
-              min={100}
-              max={2000}
-              value={state.width}
-              onChange={(e) =>
-                commit({ ...state, width: Number(e.target.value) || state.width })
-              }
-            />
-          </label>
-          <label>
-            Height (px)
-            <input
-              type="number"
-              min={100}
-              max={3000}
-              value={state.height}
-              onChange={(e) =>
-                commit({ ...state, height: Number(e.target.value) || state.height })
-              }
-            />
-          </label>
-          <label>
-            Background
-            <input
-              type="text"
-              value={state.background ?? ''}
-              onChange={(e) => commit({ ...state, background: e.target.value })}
-            />
-          </label>
+          <details className="props-accordion" open>
+            <summary>Card</summary>
+            <div className="props-accordion-body">
+              <label>
+                Width (px)
+                <input
+                  type="number"
+                  min={100}
+                  max={2000}
+                  value={state.width}
+                  onChange={(e) =>
+                    commit({ ...state, width: Number(e.target.value) || state.width })
+                  }
+                />
+              </label>
+              <label>
+                Height (px)
+                <input
+                  type="number"
+                  min={100}
+                  max={3000}
+                  value={state.height}
+                  onChange={(e) =>
+                    commit({ ...state, height: Number(e.target.value) || state.height })
+                  }
+                />
+              </label>
+              <label>
+                Background
+                <input
+                  type="text"
+                  value={state.background ?? ''}
+                  onChange={(e) => commit({ ...state, background: e.target.value })}
+                />
+              </label>
+            </div>
+          </details>
         </aside>
 
         <div className="layout-editor-canvas-column">
           <div className="layout-editor-canvas">
-            <div ref={canvasFillRef} className="layout-editor-canvas-fill">
+            <div
+              ref={canvasFillRef}
+              className="layout-editor-canvas-fill layout-editor-canvas-fill--blueprint"
+            >
               <div
                 className="layout-editor-stage-wrap"
                 style={{
@@ -720,10 +816,10 @@ export function LayoutEditor({
                       <Transformer
                         ref={trRef}
                         rotateEnabled
-                        borderStroke="#38bdf8"
+                        borderStroke="#10b981"
                         borderDash={[4, 4]}
-                        anchorStroke="#f8fafc"
-                        anchorFill="#0ea5e9"
+                        anchorStroke="#ecfdf5"
+                        anchorFill="#059669"
                         anchorSize={8}
                         boundBoxFunc={(oldBox, newBox) => newBox}
                       />
@@ -746,6 +842,38 @@ export function LayoutEditor({
             commit({ ...state, root: moveNodeInFlatList(state.root, dragId, targetId, placement) })
           }
         />
+      </div>
+
+      <div className="deck-filmstrip" role="region" aria-label="Deck preview using this layout">
+        <div className="deck-filmstrip-head">
+          <span className="deck-filmstrip-title">Deck preview</span>
+          <span className="deck-filmstrip-meta">
+            {deckRows.length === 0 ? 'No CSV rows — sample preview' : `${deckRows.length} cards`}
+          </span>
+        </div>
+        <div className="deck-filmstrip-scroll">
+          {filmstripRows.slice(0, 48).map((row, i) => {
+            const label =
+              row.Name ||
+              row.name ||
+              row.Title ||
+              row.title ||
+              Object.values(row)[0] ||
+              `Card ${i + 1}`;
+            return (
+              <div key={i} className="deck-filmstrip-item" title={String(label)}>
+                <div className="deck-filmstrip-thumb">
+                  <CardFace
+                    state={state}
+                    row={row}
+                    assetUrls={assetUrls}
+                    pixelWidth={72}
+                  />
+                </div>
+              </div>
+            );
+          })}
+        </div>
       </div>
     </div>
   );

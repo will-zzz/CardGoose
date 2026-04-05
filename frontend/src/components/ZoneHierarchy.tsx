@@ -1,13 +1,18 @@
 import { useCallback, useState } from 'react';
 import {
   Copy,
+  Eye,
+  EyeOff,
   Image as ImageIcon,
   LayoutGrid,
+  Layers,
+  Lock,
   Minus,
   Redo2,
   Trash2,
   Type,
   Undo2,
+  Unlock,
 } from 'lucide-react';
 import type { LayoutElement } from '../types/layout';
 import { isLocked, isVisible } from '../lib/layoutTree';
@@ -114,6 +119,15 @@ function ZoneToolbar({
         aria-label="Remove"
       >
         <Trash2 size={18} strokeWidth={2} />
+      </button>
+      <button
+        type="button"
+        className="zone-icon-btn"
+        disabled
+        title="Group (coming soon)"
+        aria-label="Group"
+      >
+        <Layers size={18} strokeWidth={2} />
       </button>
       <span className="zone-hierarchy-toolbar-sep" aria-hidden />
       <button
@@ -222,21 +236,21 @@ function Row({
         <span className="zone-collapse-spacer" aria-hidden />
         <button
           type="button"
-          className="zone-tool zone-tool--narrow"
+          className="zone-tool zone-tool--icon"
           onClick={() => onToggleVisible(node.id)}
           aria-label={vis ? 'Hide layer' : 'Show layer'}
-          title={vis ? 'Click to hide this layer' : 'Click to show this layer'}
+          title={vis ? 'Hide layer' : 'Show layer'}
         >
-          {vis ? 'Hide' : 'Show'}
+          {vis ? <Eye size={16} strokeWidth={2} /> : <EyeOff size={16} strokeWidth={2} />}
         </button>
         <button
           type="button"
-          className={`zone-tool zone-tool--narrow${lock ? ' zone-tool-locked' : ''}`}
+          className={`zone-tool zone-tool--icon${lock ? ' zone-tool-locked' : ''}`}
           onClick={() => onToggleLock(node.id)}
           aria-label={lock ? 'Unlock' : 'Lock'}
-          title={lock ? 'Click to unlock (allow edits)' : 'Click to lock (prevent edits)'}
+          title={lock ? 'Unlock (allow edits)' : 'Lock (prevent edits)'}
         >
-          {lock ? 'Unlock' : 'Lock'}
+          {lock ? <Lock size={16} strokeWidth={2} /> : <Unlock size={16} strokeWidth={2} />}
         </button>
       </div>
       <button type="button" className="zone-row-body" onClick={() => onSelect(node.id)}>
@@ -297,10 +311,9 @@ export function ZoneHierarchy({
   return (
     <aside className="zone-hierarchy">
       <ZoneToolbar {...toolbar} />
-      <h3>Zone hierarchy</h3>
+      <h3 className="zone-hierarchy-heading">Layers</h3>
       <p className="muted zone-hierarchy-hint">
-        Drag <strong>⋮⋮</strong> to reorder. Drop on the <strong>top</strong> or <strong>bottom</strong> half of a row
-        to place above or below.
+        Drag <strong>⋮⋮</strong> to reorder. Drop on the top or bottom half of a row to place above or below.
       </p>
       <div className="zone-tree">
         {root.length === 0 && <p className="muted">No zones yet.</p>}

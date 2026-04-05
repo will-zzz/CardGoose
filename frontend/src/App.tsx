@@ -1,12 +1,14 @@
 import { Navigate, Outlet, Route, Routes, useLocation } from 'react-router-dom';
+import { StudioAppBar } from './components/StudioAppBar';
 import { useAuth } from './contexts/useAuth';
+import { StudioChromeProvider } from './contexts/StudioChrome';
 import { DashboardPage } from './pages/DashboardPage';
 import { LoginPage } from './pages/LoginPage';
 import { ProjectPage } from './pages/ProjectPage';
 import './App.css';
 
 function ProtectedLayout() {
-  const { user, logout } = useAuth();
+  const { user } = useAuth();
   const location = useLocation();
   const wideMain = location.pathname.startsWith('/projects/');
 
@@ -15,18 +17,14 @@ function ProtectedLayout() {
   }
 
   return (
-    <div className="shell">
-      <nav className="top-nav">
-        <span className="brand">CardboardForge</span>
-        <span className="user-pill">{user.username}</span>
-        <button type="button" className="link-btn" onClick={logout}>
-          Log out
-        </button>
-      </nav>
-      <main className={`main${wideMain ? ' main-wide' : ''}`}>
-        <Outlet />
-      </main>
-    </div>
+    <StudioChromeProvider>
+      <div className="shell shell--studio">
+        <StudioAppBar />
+        <main className={`main${wideMain ? ' main-wide' : ''}`}>
+          <Outlet />
+        </main>
+      </div>
+    </StudioChromeProvider>
   );
 }
 

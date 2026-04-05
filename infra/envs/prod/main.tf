@@ -1,9 +1,9 @@
 module "vpc" {
   source = "../../modules/vpc"
 
-  environment         = var.environment
-  project_name        = var.project_name
-  rds_dev_access_cidr = var.rds_dev_access_cidr
+  environment          = var.environment
+  project_name         = var.project_name
+  rds_dev_access_cidrs = var.rds_dev_access_cidrs
 }
 
 module "ecr" {
@@ -47,7 +47,7 @@ module "rds" {
   rds_security_group_id = module.vpc.rds_security_group_id
   db_username           = var.db_username
   db_name               = var.db_name
-  publicly_accessible   = var.rds_dev_access_cidr != ""
+  publicly_accessible   = length(var.rds_dev_access_cidrs) > 0
 }
 
 module "cloudwatch" {
