@@ -1,4 +1,4 @@
-# ForgeCard Baker (worker)
+# CardboardForge Baker (worker)
 
 Python worker that consumes SQS jobs and renders PDFs / TTS assets via Playwright.
 

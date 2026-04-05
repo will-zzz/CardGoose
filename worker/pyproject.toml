@@ -3,9 +3,9 @@ requires = ["setuptools>=61"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "forgecard-baker"
+name = "cardboardforge-baker"
 version = "0.0.1"
-description = "ForgeCard PDF/TTS rendering worker (Baker)"
+description = "CardboardForge PDF/TTS rendering worker (Baker)"
 readme = "README.md"
 requires-python = ">=3.12"
 dependencies = []

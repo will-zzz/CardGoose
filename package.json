@@ -1,5 +1,5 @@
 {
-  "name": "forgecard",
+  "name": "cardboardforge",
   "private": true,
   "scripts": {
     "dev:frontend": "pnpm --filter frontend dev",

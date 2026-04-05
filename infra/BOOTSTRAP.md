@@ -1,6 +1,6 @@
 # AWS & Terraform bootstrap
 
-This guide covers creating a new AWS account for ForgeCard, configuring the CLI, and bootstrapping Terraform **remote state** (S3 + DynamoDB). After that, you can add real resources in `modules/` and apply from `envs/dev` or `envs/prod`.
+This guide covers creating a new AWS account for CardboardForge, configuring the CLI, and bootstrapping Terraform **remote state** (S3 + DynamoDB). After that, you can add real resources in `modules/` and apply from `envs/dev` or `envs/prod`.
 
 ## 1. Create an AWS account
 
@@ -56,7 +56,7 @@ Replace `YOUR_ACCOUNT_ID` if you use a globally unique suffix, or use a unique b
 
 ```bash
 export AWS_REGION=us-east-1
-export TF_STATE_BUCKET="forgecard-tf-state-${YOUR_ACCOUNT_ID}"
+export TF_STATE_BUCKET="cardboardforge-tf-state-${YOUR_ACCOUNT_ID}"
 
 aws s3api create-bucket \
   --bucket "${TF_STATE_BUCKET}" \
@@ -84,7 +84,7 @@ aws s3api put-public-access-block \
 
 ```bash
 aws dynamodb create-table \
-  --table-name forgecard-tf-locks \
+  --table-name cardboardforge-tf-locks \
   --attribute-definitions AttributeName=LockID,AttributeType=S \
   --key-schema AttributeName=LockID,KeyType=HASH \
   --billing-mode PAY_PER_REQUEST \
@@ -111,8 +111,8 @@ You can create ECR repos manually or let Terraform create them once the `ecr` mo
 Manual example:
 
 ```bash
-aws ecr create-repository --repository-name forgecard-api --region us-east-1
-aws ecr create-repository --repository-name forgecard-worker --region us-east-1
+aws ecr create-repository --repository-name cardboardforge-api --region us-east-1
+aws ecr create-repository --repository-name cardboardforge-worker --region us-east-1
 ```
 
 ## 8. GitHub Actions (optional)

@@ -9,11 +9,11 @@ terraform {
   }
 
   # Remote state: uncomment after completing infra/BOOTSTRAP.md.
-  # backend "s3" {
-  #   bucket         = "forgecard-tf-state"
-  #   key            = "envs/prod/terraform.tfstate"
-  #   region         = "us-east-1"
-  #   dynamodb_table = "forgecard-tf-locks"
-  #   encrypt        = true
-  # }
+  backend "s3" {
+    bucket         = "cardboardforge-tf-state-946547149954"
+    key            = "envs/prod/terraform.tfstate"
+    region         = "us-east-1"
+    dynamodb_table = "cardboardforge-tf-locks"
+    encrypt        = true
+  }
 }

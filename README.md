@@ -1,4 +1,4 @@
-# ForgeCard (Cardboard Forge)
+# CardboardForge (Cardboard Forge)
 
 Board game prototyping engine: data-driven design, Print & Play PDFs, and Tabletop Simulator exports.
 

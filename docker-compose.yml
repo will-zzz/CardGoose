@@ -1,24 +1,24 @@
 services:
   postgres:
     image: postgres:16-alpine
-    container_name: forgecard-postgres
+    container_name: cardboardforge-postgres
     environment:
       POSTGRES_USER: forge
       POSTGRES_PASSWORD: forge
-      POSTGRES_DB: forgecard
+      POSTGRES_DB: cardboardforge
     ports:
       - "5432:5432"
     volumes:
       - pgdata:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U forge -d forgecard"]
+      test: ["CMD-SHELL", "pg_isready -U forge -d cardboardforge"]
       interval: 5s
       timeout: 5s
       retries: 5
 
   localstack:
     image: localstack/localstack:3
-    container_name: forgecard-localstack
+    container_name: cardboardforge-localstack
     ports:
       - "4566:4566"
     environment:
@@ -31,13 +31,13 @@ services:
     build:
       context: .
       dockerfile: api/Dockerfile
-    container_name: forgecard-api
+    container_name: cardboardforge-api
     ports:
       - "3001:3001"
     environment:
       NODE_ENV: production
       PORT: "3001"
-      DATABASE_URL: postgresql://forge:forge@postgres:5432/forgecard
+      DATABASE_URL: postgresql://forge:forge@postgres:5432/cardboardforge
       AWS_REGION: us-east-1
       AWS_ACCESS_KEY_ID: test
       AWS_SECRET_ACCESS_KEY: test
@@ -53,7 +53,7 @@ services:
     build:
       context: ./worker
       dockerfile: Dockerfile
-    container_name: forgecard-worker
+    container_name: cardboardforge-worker
     environment:
       AWS_REGION: us-east-1
       AWS_ACCESS_KEY_ID: test

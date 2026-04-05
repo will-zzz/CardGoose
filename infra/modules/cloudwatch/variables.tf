@@ -4,5 +4,5 @@ variable "environment" {
 
 variable "project_name" {
   type    = string
-  default = "forgecard"
+  default = "cardboardforge"
 }

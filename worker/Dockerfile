@@ -9,4 +9,4 @@ RUN pip install --no-cache-dir -r requirements.txt
 COPY src ./src
 COPY pyproject.toml ./
 ENV PYTHONPATH=/app/src
-CMD ["python", "-c", "print('forgecard-baker ready')"]
+CMD ["python", "-c", "print('cardboardforge-baker ready')"]

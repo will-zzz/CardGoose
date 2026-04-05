@@ -55,7 +55,7 @@ jobs:
       - name: Prisma generate
         working-directory: api
         env:
-          DATABASE_URL: postgresql://forge:forge@localhost:5432/forgecard
+          DATABASE_URL: postgresql://forge:forge@localhost:5432/cardboardforge
         run: pnpm exec prisma generate
 
       - name: Vitest

@@ -13,5 +13,5 @@ variable "environment" {
 variable "project_name" {
   description = "Resource name prefix."
   type        = string
-  default     = "forgecard"
+  default     = "cardboardforge"
 }

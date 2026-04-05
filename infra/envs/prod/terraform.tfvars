@@ -1,3 +1,3 @@
 aws_region   = "us-east-1"
 environment  = "prod"
-project_name = "forgecard"
+project_name = "cardboardforge"
