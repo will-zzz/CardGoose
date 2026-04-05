@@ -1,3 +1,7 @@
-aws_region   = "us-east-1"
-environment  = "prod"
-project_name = "cardboardforge"
+# =============================================================================
+# PROD ENVIRONMENT — NOT IN USE (see main.tf for details)
+# =============================================================================
+
+# aws_region   = "us-east-1"
+# environment  = "prod"
+# project_name = "cardboardforge"

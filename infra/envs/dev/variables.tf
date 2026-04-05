@@ -15,3 +15,21 @@ variable "project_name" {
   type        = string
   default     = "cardboardforge"
 }
+
+variable "db_username" {
+  description = "PostgreSQL master username."
+  type        = string
+  default     = "forge"
+}
+
+variable "db_name" {
+  description = "PostgreSQL database name."
+  type        = string
+  default     = "cardboardforge"
+}
+
+variable "ecs_desired_count" {
+  description = "Fargate tasks per service."
+  type        = number
+  default     = 1
+}

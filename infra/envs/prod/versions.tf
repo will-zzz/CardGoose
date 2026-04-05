@@ -1,3 +1,8 @@
+# =============================================================================
+# PROD ENVIRONMENT — NOT IN USE (see main.tf for details)
+# =============================================================================
+
+/*
 terraform {
   required_version = ">= 1.9"
 
@@ -6,9 +11,12 @@ terraform {
       source  = "hashicorp/aws"
       version = "~> 5.0"
     }
+    random = {
+      source  = "hashicorp/random"
+      version = "~> 3.6"
+    }
   }
 
-  # Remote state: uncomment after completing infra/BOOTSTRAP.md.
   backend "s3" {
     bucket         = "cardboardforge-tf-state-946547149954"
     key            = "envs/prod/terraform.tfstate"
@@ -17,3 +25,4 @@ terraform {
     encrypt        = true
   }
 }
+*/
