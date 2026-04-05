@@ -420,6 +420,10 @@ button:disabled {
   background-position: -1px -1px;
 }
 
+.layout-editor-grid-bg--hidden {
+  background-image: none;
+}
+
 .layout-fullscreen .layout-editor {
   margin-top: 0;
 }
@@ -1104,26 +1108,9 @@ button.zone-row-body:hover {
   color: var(--text);
 }
 
-.editor-save-status--dirty {
-  color: #fbbf24;
-}
-
-.editor-save-dot {
-  width: 8px;
-  height: 8px;
-  border-radius: 999px;
-  background: #fbbf24;
-  flex-shrink: 0;
-}
-
-.editor-save-dot--ok {
-  background: #10b981;
-  box-shadow: 0 0 10px rgba(16, 185, 129, 0.5);
-}
-
-.editor-save-time {
-  opacity: 0.75;
-  margin-left: 2px;
+.editor-save-loader {
+  color: var(--text);
+  opacity: 0.85;
 }
 
 .editor-save-icon-spin {

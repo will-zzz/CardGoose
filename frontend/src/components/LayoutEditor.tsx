@@ -724,7 +724,10 @@ export const LayoutEditor = forwardRef<LayoutEditorHandle, LayoutEditorProps>(fu
 
   return (
     <div className="layout-editor">
-      <div className="layout-editor-grid-bg" aria-hidden />
+      <div
+        className={`layout-editor-grid-bg${showGrid ? '' : ' layout-editor-grid-bg--hidden'}`}
+        aria-hidden
+      />
       <div className="layout-editor-shell">
         <aside className="layout-editor-props layout-editor-props-left">
           <p className="props-panel-title">

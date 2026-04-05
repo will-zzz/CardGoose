@@ -1,10 +1,8 @@
 import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react';
 import {
   Box,
-  CheckCircle2,
   ChevronDown,
   ChevronRight,
-  CircleAlert,
   Loader2,
   User,
 } from 'lucide-react';
@@ -336,38 +334,16 @@ function EditorBar() {
         </div>
 
         <div className="editor-bar-status-save">
-          <div
-            className={`editor-save-status${le.layoutIsDirty ? ' editor-save-status--dirty' : ''}`}
-            role="status"
-            aria-live="polite"
-          >
-            <span
-              className={`editor-save-dot${le.layoutIsDirty ? '' : ' editor-save-dot--ok'}`}
-              aria-hidden
-            />
+          <div className="editor-save-status" role="status" aria-live="polite">
             {le.busy ? (
               <>
-                <Loader2 className="editor-save-icon-spin" size={14} aria-hidden />
+                <Loader2 className="editor-save-icon-spin editor-save-loader" size={14} aria-hidden />
                 Saving…
               </>
             ) : le.layoutIsDirty ? (
-              <>
-                <CircleAlert size={14} aria-hidden />
-                Unsaved changes
-              </>
+              <>Unsaved changes</>
             ) : (
-              <>
-                <CheckCircle2 size={14} aria-hidden />
-                All changes saved
-                {le.lastSavedAt && (
-                  <span className="editor-save-time">
-                    {le.lastSavedAt.toLocaleTimeString(undefined, {
-                      hour: 'numeric',
-                      minute: '2-digit',
-                    })}
-                  </span>
-                )}
-              </>
+              <>All changes saved</>
             )}
           </div>
           <button
