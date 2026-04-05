@@ -1,4 +1,4 @@
-import { Navigate, Outlet, Route, Routes } from 'react-router-dom';
+import { Navigate, Outlet, Route, Routes, useLocation } from 'react-router-dom';
 import { useAuth } from './contexts/useAuth';
 import { DashboardPage } from './pages/DashboardPage';
 import { LoginPage } from './pages/LoginPage';
@@ -7,6 +7,8 @@ import './App.css';
 
 function ProtectedLayout() {
   const { user, logout } = useAuth();
+  const location = useLocation();
+  const wideMain = location.pathname.startsWith('/projects/');
 
   if (!user) {
     return <Navigate to="/login" replace />;
@@ -21,7 +23,7 @@ function ProtectedLayout() {
           Log out
         </button>
       </nav>
-      <main className="main">
+      <main className={`main${wideMain ? ' main-wide' : ''}`}>
         <Outlet />
       </main>
     </div>

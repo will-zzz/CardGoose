@@ -2,7 +2,7 @@ import { Router, type IRouter } from 'express';
 import multer from 'multer';
 import { prisma } from '../lib/prisma.js';
 import { requireAuth } from '../middleware/auth.js';
-import { getAssetsBucket, putObject } from '../lib/s3.js';
+import { getAssetsBucket, getSignedGetUrl, putObject } from '../lib/s3.js';
 
 export const assetsRouter: IRouter = Router();
 assetsRouter.use(requireAuth);
@@ -27,7 +27,19 @@ assetsRouter.get('/projects/:projectId/assets', async (req, res) => {
     orderBy: { createdAt: 'desc' },
     select: { id: true, artKey: true, s3Key: true, createdAt: true, updatedAt: true },
   });
-  res.json({ assets });
+  const includeUrls = String(req.query.includeUrls) === '1' || String(req.query.includeUrls) === 'true';
+  if (!includeUrls) {
+    res.json({ assets });
+    return;
+  }
+  const bucket = getAssetsBucket();
+  const withUrls = await Promise.all(
+    assets.map(async (a) => ({
+      ...a,
+      url: await getSignedGetUrl(bucket, a.s3Key),
+    })),
+  );
+  res.json({ assets: withUrls });
 });
 
 assetsRouter.post('/projects/:projectId/assets', upload.single('file'), async (req, res) => {
