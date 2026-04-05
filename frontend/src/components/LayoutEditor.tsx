@@ -9,7 +9,6 @@ import {
   useMemo,
   useState,
 } from 'react';
-import { ChevronDown, ChevronUp } from 'lucide-react';
 import type { ReactNode } from 'react';
 import type Konva from 'konva';
 import type { KonvaEventObject } from 'konva/lib/Node';
@@ -797,20 +796,6 @@ export const LayoutEditor = forwardRef<LayoutEditorHandle, LayoutEditorProps>(fu
         </aside>
 
         <div className="layout-editor-canvas-column">
-          <button
-            type="button"
-            className="deck-preview-latch"
-            aria-expanded={deckPreviewOpen}
-            aria-controls={deckDrawerId}
-            onClick={() => setDeckPreviewOpen((o) => !o)}
-          >
-            <span>Deck preview</span>
-            {deckPreviewOpen ? (
-              <ChevronDown size={16} strokeWidth={2} aria-hidden className="deck-preview-latch-icon" />
-            ) : (
-              <ChevronUp size={16} strokeWidth={2} aria-hidden className="deck-preview-latch-icon" />
-            )}
-          </button>
           <div className="layout-editor-canvas">
             <div ref={canvasFillRef} className="layout-editor-canvas-fill">
               <div
@@ -936,6 +921,18 @@ export const LayoutEditor = forwardRef<LayoutEditorHandle, LayoutEditorProps>(fu
           </div>
         </div>
       </div>
+
+      <footer className="layout-editor-status-bar">
+        <button
+          type="button"
+          className="layout-editor-status-bar-btn"
+          aria-expanded={deckPreviewOpen}
+          aria-controls={deckDrawerId}
+          onClick={() => setDeckPreviewOpen((o) => !o)}
+        >
+          Deck preview
+        </button>
+      </footer>
     </div>
   );
 });

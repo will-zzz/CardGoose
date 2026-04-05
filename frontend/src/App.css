@@ -24,11 +24,13 @@ body.layout-editor-open .main.main-wide {
   min-height: 0;
   overflow: hidden;
   padding: 0;
+  padding-bottom: env(safe-area-inset-bottom, 0px);
   margin: 0;
   max-width: none;
   width: 100%;
   display: flex;
   flex-direction: column;
+  box-sizing: border-box;
 }
 
 .top-nav {
@@ -192,7 +194,7 @@ textarea {
 button[type='submit'],
 .page button[type='button']:not(.link-btn):not(.link-danger):not(.zone-tool):not(.zone-row-body):not(
     .layout-fullscreen-ghost-btn
-  ):not(.zone-icon-btn) {
+  ):not(.zone-icon-btn):not(.layout-editor-status-bar-btn) {
   padding: 10px 14px;
   border-radius: 6px;
   border: 1px solid var(--accent-border);
@@ -382,6 +384,7 @@ button:disabled {
 }
 
 .layout-editor {
+  --layout-editor-status-bar-h: 28px;
   position: relative;
   margin-top: 0;
   flex: 1;
@@ -453,7 +456,7 @@ button:disabled {
   display: flex;
   flex-direction: column;
   overflow: hidden;
-  padding: 48px 8px 8px;
+  padding: 8px;
   box-sizing: border-box;
 }
 
@@ -1203,46 +1206,51 @@ button.zone-row-body:hover {
   margin-bottom: 16px;
 }
 
-/* —— Layout editor: deck latch + overlay drawer —— */
-.deck-preview-latch {
-  position: absolute;
-  top: 10px;
-  left: 50%;
-  transform: translateX(-50%);
-  z-index: 12;
-  display: inline-flex;
+/* —— Layout editor: status bar + deck drawer above it —— */
+.layout-editor-status-bar {
+  flex: 0 0 var(--layout-editor-status-bar-h);
+  height: var(--layout-editor-status-bar-h);
+  min-height: var(--layout-editor-status-bar-h);
+  display: flex;
   align-items: center;
-  gap: 8px;
-  padding: 6px 14px 7px;
+  padding: 0 8px;
+  background: #161616;
+  border-top: 1px solid rgba(255, 255, 255, 0.06);
+  z-index: 30;
+  box-sizing: border-box;
+}
+
+.layout-editor-status-bar-btn {
+  padding: 0 6px;
   margin: 0;
-  border: 1px solid rgba(255, 255, 255, 0.1);
-  border-radius: 8px;
-  background: rgba(15, 15, 17, 0.88);
-  backdrop-filter: blur(10px);
-  color: var(--text-h);
+  border: none;
+  border-radius: 4px;
+  background: transparent;
+  color: rgba(161, 161, 170, 0.95);
   font: inherit;
-  font-size: 12px;
-  font-weight: 600;
-  letter-spacing: 0.02em;
+  font-size: 11px;
+  font-weight: 400;
+  line-height: 1.2;
+  letter-spacing: 0.01em;
   cursor: pointer;
-  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.35);
+  -webkit-font-smoothing: antialiased;
 }
 
-.deck-preview-latch:hover {
-  background: rgba(28, 28, 32, 0.92);
-  border-color: rgba(16, 185, 129, 0.35);
+.layout-editor-status-bar-btn:hover {
+  background: rgba(255, 255, 255, 0.05);
+  color: #d4d4d8;
 }
 
-.deck-preview-latch-icon {
-  opacity: 0.85;
-  flex-shrink: 0;
+.layout-editor-status-bar-btn[aria-expanded='true'] {
+  color: #e4e4e7;
+  background: rgba(255, 255, 255, 0.06);
 }
 
 .deck-preview-drawer {
   position: absolute;
   left: 0;
   right: 0;
-  bottom: 0;
+  bottom: var(--layout-editor-status-bar-h);
   z-index: 20;
   display: flex;
   flex-direction: column;
