@@ -9,7 +9,7 @@ import {
   useMemo,
   useState,
 } from 'react';
-import type { ReactNode } from 'react';
+import type { KeyboardEvent, MouseEvent, ReactNode } from 'react';
 import type Konva from 'konva';
 import type { KonvaEventObject } from 'konva/lib/Node';
 import {
@@ -22,12 +22,13 @@ import {
   Text,
   Transformer,
 } from 'react-konva';
-import { Layers } from 'lucide-react';
+import { Layers, Minus, Plus } from 'lucide-react';
 import type { LayoutElement, LayoutStateV2 } from '../types/layout';
 import { DEFAULT_NEW_TEXT } from '../types/layout';
 import { applyTemplate } from '../lib/template';
 import { CardFace } from './CardFace';
 import { useImageElement } from './useImageElement';
+import { LayoutEditorFooterButton } from './LayoutEditorFooterButton';
 import { ZoneHierarchy, type ZoneHierarchyToolbarProps } from './ZoneHierarchy';
 import {
   applyInsert,
@@ -326,6 +327,17 @@ function EditorNode({
 
 const HISTORY_CAP = 50;
 
+/** Allow typed values like 21%; wheel/buttons still clamp to this range. */
+const ZOOM_MIN_PCT = 10;
+const ZOOM_MAX_PCT = 400;
+/** Step for +/- buttons (10% fine steps; hold Shift for 25% coarse steps). */
+const ZOOM_STEP_FINE = 10;
+const ZOOM_STEP_COARSE = 25;
+
+function clampZoomPercent(n: number): number {
+  return Math.min(ZOOM_MAX_PCT, Math.max(ZOOM_MIN_PCT, n));
+}
+
 function propsInspectorTitle(node: LayoutElement | null): string {
   if (!node) return 'Nothing selected';
   if (node.type === 'text') {
@@ -363,6 +375,8 @@ export const LayoutEditor = forwardRef<LayoutEditorHandle, LayoutEditorProps>(fu
   const historyFuture = useRef<LayoutStateV2[]>([]);
   const canvasFillRef = useRef<HTMLDivElement>(null);
   const [viewport, setViewport] = useState({ w: 0, h: 0 });
+  /** 100 = fit-to-viewport; wheel/buttons adjust relative to that baseline. */
+  const [zoomPercent, setZoomPercent] = useState(100);
   const trRef = useRef<Konva.Transformer>(null);
   const nodeRefs = useRef<Map<string, Konva.Node>>(new Map());
 
@@ -443,6 +457,21 @@ export const LayoutEditor = forwardRef<LayoutEditorHandle, LayoutEditorProps>(fu
     return () => ro.disconnect();
   }, []);
 
+  useEffect(() => {
+    const el = canvasFillRef.current;
+    if (!el) return;
+    const onWheel = (e: WheelEvent) => {
+      if (!e.ctrlKey && !e.metaKey) return;
+      e.preventDefault();
+      const delta = -e.deltaY;
+      setZoomPercent((p) =>
+        clampZoomPercent(p * Math.exp(delta * 0.0018)),
+      );
+    };
+    el.addEventListener('wheel', onWheel, { passive: false });
+    return () => el.removeEventListener('wheel', onWheel);
+  }, []);
+
   const setNodeRef = useCallback((id: string, node: Konva.Node | null) => {
     if (node) nodeRefs.current.set(id, node);
     else nodeRefs.current.delete(id);
@@ -478,13 +507,17 @@ export const LayoutEditor = forwardRef<LayoutEditorHandle, LayoutEditorProps>(fu
 
   const bg = state.background ?? '#1e1e24';
   const pad = 8;
-  const scale =
-    viewport.w > 0 && viewport.h > 0
-      ? Math.min(
-          (viewport.w - pad * 2) / state.width,
-          (viewport.h - pad * 2) / state.height,
-        )
-      : Math.min(1, 480 / state.width);
+  const fitScale = useMemo(() => {
+    if (viewport.w > 0 && viewport.h > 0) {
+      return Math.min(
+        (viewport.w - pad * 2) / state.width,
+        (viewport.h - pad * 2) / state.height,
+      );
+    }
+    return Math.min(1, 480 / state.width);
+  }, [viewport.w, viewport.h, state.width, state.height]);
+
+  const scale = fitScale * (zoomPercent / 100);
   const stageW = state.width * scale;
   const stageH = state.height * scale;
   const showGrid = state.showGrid !== false;
@@ -594,6 +627,45 @@ export const LayoutEditor = forwardRef<LayoutEditorHandle, LayoutEditorProps>(fu
   const filmstripRows = deckRows.length > 0 ? deckRows : [{}];
   const [deckPreviewOpen, setDeckPreviewOpen] = useState(false);
   const deckDrawerId = useId();
+
+  const zoomOut = useCallback((e: MouseEvent<HTMLButtonElement>) => {
+    const step = e.shiftKey ? ZOOM_STEP_COARSE : ZOOM_STEP_FINE;
+    setZoomPercent((p) => clampZoomPercent(p - step));
+  }, []);
+  const zoomIn = useCallback((e: MouseEvent<HTMLButtonElement>) => {
+    const step = e.shiftKey ? ZOOM_STEP_COARSE : ZOOM_STEP_FINE;
+    setZoomPercent((p) => clampZoomPercent(p + step));
+  }, []);
+  const zoomDisplayPct = Math.round(zoomPercent);
+  const [zoomInputEditing, setZoomInputEditing] = useState(false);
+  const [zoomInputDraft, setZoomInputDraft] = useState('');
+  const zoomInputId = useId();
+
+  const commitZoomInput = useCallback(() => {
+    const raw = zoomInputDraft.trim();
+    if (raw !== '') {
+      const n = Number.parseInt(raw, 10);
+      if (Number.isFinite(n)) setZoomPercent(clampZoomPercent(n));
+    }
+    setZoomInputEditing(false);
+  }, [zoomInputDraft]);
+
+  const onZoomInputKeyDown = useCallback(
+    (e: KeyboardEvent<HTMLInputElement>) => {
+      if (e.key === 'Enter') {
+        e.preventDefault();
+        e.currentTarget.blur();
+        return;
+      }
+      if (e.key === 'Escape') {
+        e.preventDefault();
+        setZoomInputDraft(String(Math.round(zoomPercent)));
+        setZoomInputEditing(false);
+        e.currentTarget.blur();
+      }
+    },
+    [zoomPercent],
+  );
 
   return (
     <div className="layout-editor">
@@ -924,16 +996,66 @@ export const LayoutEditor = forwardRef<LayoutEditorHandle, LayoutEditorProps>(fu
       </div>
 
       <footer className="layout-editor-status-bar">
-        <button
-          type="button"
-          className="layout-editor-status-bar-btn"
+        <LayoutEditorFooterButton
+          edge="start"
           aria-expanded={deckPreviewOpen}
           aria-controls={deckDrawerId}
           onClick={() => setDeckPreviewOpen((o) => !o)}
         >
-          <Layers className="layout-editor-status-bar-icon" size={14} aria-hidden />
+          <Layers className="layout-editor-footer-icon" size={14} aria-hidden />
           Deck preview
-        </button>
+        </LayoutEditorFooterButton>
+        <div
+          className="layout-editor-zoom"
+          role="group"
+          aria-label="Canvas zoom"
+          title="⌘/Ctrl + scroll on canvas to zoom"
+        >
+          <LayoutEditorFooterButton
+            variant="icon"
+            aria-label="Zoom out"
+            title="Zoom out — Shift for 25% steps"
+            disabled={zoomPercent <= ZOOM_MIN_PCT + 1e-3}
+            onClick={zoomOut}
+          >
+            <Minus className="layout-editor-footer-icon" size={14} strokeWidth={2} aria-hidden />
+          </LayoutEditorFooterButton>
+          <label className="layout-editor-zoom-field" htmlFor={zoomInputId} title="Type zoom % — Enter to apply">
+            <input
+              id={zoomInputId}
+              type="text"
+              inputMode="numeric"
+              autoComplete="off"
+              spellCheck={false}
+              className="layout-editor-zoom-input"
+              aria-label="Zoom percent"
+              value={zoomInputEditing ? zoomInputDraft : String(zoomDisplayPct)}
+              onFocus={(e) => {
+                setZoomInputEditing(true);
+                setZoomInputDraft(String(zoomDisplayPct));
+                e.target.select();
+              }}
+              onChange={(e) => {
+                const v = e.target.value.replace(/\D/g, '').slice(0, 3);
+                setZoomInputDraft(v);
+              }}
+              onBlur={commitZoomInput}
+              onKeyDown={onZoomInputKeyDown}
+            />
+            <span className="layout-editor-zoom-suffix" aria-hidden>
+              %
+            </span>
+          </label>
+          <LayoutEditorFooterButton
+            variant="icon"
+            aria-label="Zoom in"
+            title="Zoom in — Shift for 25% steps"
+            disabled={zoomPercent >= ZOOM_MAX_PCT - 1e-3}
+            onClick={zoomIn}
+          >
+            <Plus className="layout-editor-footer-icon" size={14} strokeWidth={2} aria-hidden />
+          </LayoutEditorFooterButton>
+        </div>
       </footer>
     </div>
   );
