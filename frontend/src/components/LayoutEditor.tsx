@@ -2,12 +2,14 @@ import {
   forwardRef,
   useCallback,
   useEffect,
+  useId,
   useImperativeHandle,
   useLayoutEffect,
   useRef,
   useMemo,
   useState,
 } from 'react';
+import { ChevronDown, ChevronUp } from 'lucide-react';
 import type { ReactNode } from 'react';
 import type Konva from 'konva';
 import type { KonvaEventObject } from 'konva/lib/Node';
@@ -590,9 +592,12 @@ export const LayoutEditor = forwardRef<LayoutEditorHandle, LayoutEditorProps>(fu
   );
 
   const filmstripRows = deckRows.length > 0 ? deckRows : [{}];
+  const [deckPreviewOpen, setDeckPreviewOpen] = useState(false);
+  const deckDrawerId = useId();
 
   return (
     <div className="layout-editor">
+      <div className="layout-editor-grid-bg" aria-hidden />
       <div className="layout-editor-shell">
         <aside className="layout-editor-props layout-editor-props-left">
           <p className="props-panel-title">
@@ -792,11 +797,22 @@ export const LayoutEditor = forwardRef<LayoutEditorHandle, LayoutEditorProps>(fu
         </aside>
 
         <div className="layout-editor-canvas-column">
+          <button
+            type="button"
+            className="deck-preview-latch"
+            aria-expanded={deckPreviewOpen}
+            aria-controls={deckDrawerId}
+            onClick={() => setDeckPreviewOpen((o) => !o)}
+          >
+            <span>Deck preview</span>
+            {deckPreviewOpen ? (
+              <ChevronDown size={16} strokeWidth={2} aria-hidden className="deck-preview-latch-icon" />
+            ) : (
+              <ChevronUp size={16} strokeWidth={2} aria-hidden className="deck-preview-latch-icon" />
+            )}
+          </button>
           <div className="layout-editor-canvas">
-            <div
-              ref={canvasFillRef}
-              className="layout-editor-canvas-fill layout-editor-canvas-fill--blueprint"
-            >
+            <div ref={canvasFillRef} className="layout-editor-canvas-fill">
               <div
                 className="layout-editor-stage-wrap"
                 style={{
@@ -881,35 +897,43 @@ export const LayoutEditor = forwardRef<LayoutEditorHandle, LayoutEditorProps>(fu
         />
       </div>
 
-      <div className="deck-filmstrip" role="region" aria-label="Deck preview using this layout">
-        <div className="deck-filmstrip-head">
-          <span className="deck-filmstrip-title">Deck preview</span>
-          <span className="deck-filmstrip-meta">
-            {deckRows.length === 0 ? 'No CSV rows — sample preview' : `${deckRows.length} cards`}
-          </span>
-        </div>
-        <div className="deck-filmstrip-scroll">
-          {filmstripRows.slice(0, 48).map((row, i) => {
-            const label =
-              row.Name ||
-              row.name ||
-              row.Title ||
-              row.title ||
-              Object.values(row)[0] ||
-              `Card ${i + 1}`;
-            return (
-              <div key={i} className="deck-filmstrip-item" title={String(label)}>
-                <div className="deck-filmstrip-thumb">
-                  <CardFace
-                    state={state}
-                    row={row}
-                    assetUrls={assetUrls}
-                    pixelWidth={72}
-                  />
+      <div
+        id={deckDrawerId}
+        className={`deck-preview-drawer${deckPreviewOpen ? ' deck-preview-drawer--open' : ''}`}
+        role="region"
+        aria-label="Deck preview using this layout"
+        aria-hidden={!deckPreviewOpen}
+      >
+        <div className="deck-filmstrip deck-filmstrip--overlay">
+          <div className="deck-filmstrip-head">
+            <span className="deck-filmstrip-title">Deck preview</span>
+            <span className="deck-filmstrip-meta">
+              {deckRows.length === 0 ? 'No CSV rows — sample preview' : `${deckRows.length} cards`}
+            </span>
+          </div>
+          <div className="deck-filmstrip-scroll">
+            {filmstripRows.slice(0, 48).map((row, i) => {
+              const label =
+                row.Name ||
+                row.name ||
+                row.Title ||
+                row.title ||
+                Object.values(row)[0] ||
+                `Card ${i + 1}`;
+              return (
+                <div key={i} className="deck-filmstrip-item" title={String(label)}>
+                  <div className="deck-filmstrip-thumb">
+                    <CardFace
+                      state={state}
+                      row={row}
+                      assetUrls={assetUrls}
+                      pixelWidth={72}
+                    />
+                  </div>
                 </div>
-              </div>
-            );
-          })}
+              );
+            })}
+          </div>
         </div>
       </div>
     </div>
