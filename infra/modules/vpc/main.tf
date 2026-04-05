@@ -126,3 +126,14 @@ resource "aws_security_group" "rds" {
     Name = "${local.name_prefix}-rds-sg"
   }
 }
+
+resource "aws_vpc_security_group_ingress_rule" "rds_from_dev" {
+  count = var.rds_dev_access_cidr != "" ? 1 : 0
+
+  security_group_id = aws_security_group.rds.id
+  description       = "Postgres from developer machine (local API / Prisma)"
+  from_port         = 5432
+  to_port           = 5432
+  ip_protocol       = "tcp"
+  cidr_ipv4         = var.rds_dev_access_cidr
+}

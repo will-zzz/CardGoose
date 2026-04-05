@@ -1,14 +1,12 @@
 # Infrastructure (Terraform)
 
-- **Modules**: [`modules/`](modules/) — VPC, ECS, ECR, RDS, S3, SQS, IAM, CloudWatch (placeholders).
-- **Environments**: [`envs/dev`](envs/dev), [`envs/prod`](envs/prod).
+- **Modules**: [`modules/`](modules/) — VPC, ECS, ECR, RDS, S3, SQS, IAM, CloudWatch.
+- **AWS stack**: [`envs/prod`](envs/prod) — single Terraform workspace (local dev is not Terraform).
 
 ## Usage
 
-From an environment directory:
-
 ```bash
-cd envs/dev
+cd envs/prod
 terraform init
 terraform validate
 terraform plan

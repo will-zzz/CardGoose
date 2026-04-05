@@ -1,6 +1,6 @@
 # AWS & Terraform bootstrap
 
-This guide covers creating a new AWS account for CardboardForge, configuring the CLI, and bootstrapping Terraform **remote state** (S3 + DynamoDB). After that, you can add real resources in `modules/` and apply from `envs/dev` or `envs/prod`.
+This guide covers creating a new AWS account for CardboardForge, configuring the CLI, and bootstrapping Terraform **remote state** (S3 + DynamoDB). After that, apply from [`envs/prod`](../envs/prod) (single AWS environment).
 
 ## 1. Create an AWS account
 
@@ -93,14 +93,13 @@ aws dynamodb create-table \
 
 ### 6.3 Enable remote backend in Terraform
 
-1. Open `infra/envs/dev/versions.tf` (and `infra/envs/prod/versions.tf`).
-2. Uncomment the `backend "s3" { ... }` block.
-3. Set `bucket` to `${TF_STATE_BUCKET}` and confirm `region`, `key`, and `dynamodb_table` match what you created.
+1. Open `infra/envs/prod/versions.tf`.
+2. Confirm the `backend "s3" { ... }` block matches your bucket, region, `key`, and `dynamodb_table`.
 
 Initialize:
 
 ```bash
-cd infra/envs/dev
+cd infra/envs/prod
 terraform init -migrate-state   # if migrating from local state; first time: terraform init
 ```
 
@@ -127,7 +126,7 @@ Use Docker Compose for **PostgreSQL** and **LocalStack** (S3/SQS emulation):
 pnpm docker:up
 ```
 
-Copy `.env.example` to `.env` and point `AWS_ENDPOINT_URL` at LocalStack when testing the API/worker against emulated services.
+Copy `.env.local.example` to `.env.local` and point `AWS_ENDPOINT_URL` at LocalStack when testing the API/worker against emulated services.
 
 ## Reference
 

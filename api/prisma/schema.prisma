@@ -7,11 +7,11 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
-/// Auth: email + password (hashed); JWT issued separately.
+/// Auth: username + password (hashed); JWT issued separately.
 model User {
-  id        String    @id @default(uuid()) @db.Uuid
-  email     String    @unique
-  passwordHash String @map("password_hash")
+  id           String   @id @default(uuid()) @db.Uuid
+  username     String   @unique
+  passwordHash String   @map("password_hash")
   createdAt DateTime  @default(now()) @map("created_at")
   updatedAt DateTime  @updatedAt @map("updated_at")
 

@@ -31,3 +31,9 @@ variable "db_name" {
   type    = string
   default = "cardboardforge"
 }
+
+variable "publicly_accessible" {
+  description = "If true, RDS gets a public address (needed for local dev from your laptop when combined with RDS SG dev rule)."
+  type        = bool
+  default     = false
+}

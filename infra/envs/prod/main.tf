@@ -1,16 +1,9 @@
-# =============================================================================
-# PROD ENVIRONMENT — NOT IN USE
-# Commented out to avoid paying for a duplicate set of AWS resources (VPC, RDS,
-# ECS, etc.). Uncomment and run `terraform init && terraform apply` when the
-# project is ready for a production deployment.
-# =============================================================================
-
-/*
 module "vpc" {
   source = "../../modules/vpc"
 
-  environment  = var.environment
-  project_name = var.project_name
+  environment         = var.environment
+  project_name        = var.project_name
+  rds_dev_access_cidr = var.rds_dev_access_cidr
 }
 
 module "ecr" {
@@ -54,6 +47,7 @@ module "rds" {
   rds_security_group_id = module.vpc.rds_security_group_id
   db_username           = var.db_username
   db_name               = var.db_name
+  publicly_accessible   = var.rds_dev_access_cidr != ""
 }
 
 module "cloudwatch" {
@@ -94,4 +88,3 @@ module "ecs" {
 
   depends_on = [module.cloudwatch, module.rds, module.iam]
 }
-*/

@@ -1,35 +1,42 @@
-# =============================================================================
-# PROD ENVIRONMENT — NOT IN USE (see main.tf for details)
-# =============================================================================
-
-/*
 variable "aws_region" {
-  type    = string
-  default = "us-east-1"
+  description = "AWS region (e.g. us-east-1)."
+  type        = string
+  default     = "us-east-1"
 }
 
 variable "environment" {
-  type    = string
-  default = "prod"
+  description = "Name suffix for AWS resources (e.g. cardboardforge-prod-*)."
+  type        = string
+  default     = "prod"
 }
 
 variable "project_name" {
-  type    = string
-  default = "cardboardforge"
+  description = "Resource name prefix."
+  type        = string
+  default     = "cardboardforge"
 }
 
 variable "db_username" {
-  type    = string
-  default = "forge"
+  description = "PostgreSQL master username."
+  type        = string
+  default     = "forge"
 }
 
 variable "db_name" {
-  type    = string
-  default = "cardboardforge"
+  description = "PostgreSQL database name."
+  type        = string
+  default     = "cardboardforge"
 }
 
 variable "ecs_desired_count" {
-  type    = number
-  default = 0
+  description = "Fargate tasks per service."
+  type        = number
+  default     = 1
 }
-*/
+
+variable "rds_dev_access_cidr" {
+  description = "Your public IP as /32 (e.g. output of curl -s https://checkip.amazonaws.com plus /32) so local Node can reach prod RDS. Empty = RDS stays private (ECS only)."
+  type        = string
+  default     = ""
+  sensitive   = false
+}

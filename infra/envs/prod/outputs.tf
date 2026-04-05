@@ -1,8 +1,3 @@
-# =============================================================================
-# PROD ENVIRONMENT — NOT IN USE (see main.tf for details)
-# =============================================================================
-
-/*
 output "stack" {
   description = "Wired module identifiers."
   value = {
@@ -18,7 +13,8 @@ output "stack" {
 }
 
 output "ecr_api_repository_url" {
-  value = module.ecr.api_repository_url
+  description = "docker push target for API image."
+  value       = module.ecr.api_repository_url
 }
 
 output "ecr_worker_repository_url" {
@@ -45,7 +41,12 @@ output "rds_endpoint" {
   value = module.rds.db_endpoint
 }
 
+output "rds_master_password" {
+  description = "Retrieve with: terraform output -raw rds_master_password"
+  value       = module.rds.db_password
+  sensitive   = true
+}
+
 output "sns_alerts_topic_arn" {
   value = module.cloudwatch.alerts_topic_arn
 }
-*/
