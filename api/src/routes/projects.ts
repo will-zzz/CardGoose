@@ -1,6 +1,7 @@
 import { Router, type IRouter } from 'express';
 import { prisma } from '../lib/prisma.js';
 import { requireAuth } from '../middleware/auth.js';
+import { assertHttpsCsvUrl, parseCsvText } from '../lib/csv.js';
 
 export const projectsRouter: IRouter = Router();
 projectsRouter.use(requireAuth);
@@ -175,7 +176,7 @@ projectsRouter.delete('/:id/layouts/:layoutId', async (req, res) => {
   res.status(204).send();
 });
 
-/** Replace CSV dataset (parsed client-side to JSON) */
+/** Replace CSV dataset (parsed client-side to JSON). Optional `sourceUrl` clears or sets linked fetch URL. */
 projectsRouter.put('/:id/data', async (req, res) => {
   const userId = req.user!.id;
   const id = String(req.params.id);
@@ -184,16 +185,125 @@ projectsRouter.put('/:id/data', async (req, res) => {
     res.status(404).json({ error: 'Project not found' });
     return;
   }
+  const body = req.body as {
+    headers?: unknown;
+    rows?: unknown;
+    sourceUrl?: unknown;
+  };
   const parsed = parseCsvPayload(req.body);
   if (!parsed) {
     res.status(400).json({ error: 'Body must be { headers: string[], rows: Record<string,string>[] }' });
     return;
   }
+  const data: { csvData: typeof parsed; csvSourceUrl?: string | null } = { csvData: parsed };
+  if (body.sourceUrl !== undefined) {
+    if (body.sourceUrl === null || body.sourceUrl === '') {
+      data.csvSourceUrl = null;
+    } else if (typeof body.sourceUrl === 'string') {
+      try {
+        data.csvSourceUrl = assertHttpsCsvUrl(body.sourceUrl);
+      } catch (e) {
+        res.status(400).json({ error: e instanceof Error ? e.message : 'Invalid source URL' });
+        return;
+      }
+    } else {
+      res.status(400).json({ error: 'sourceUrl must be string or null' });
+      return;
+    }
+  }
   await prisma.project.update({
     where: { id },
-    data: { csvData: parsed },
+    data,
   });
-  res.json({ csvData: parsed });
+  const updated = await prisma.project.findFirst({
+    where: { id },
+    select: { csvData: true, csvSourceUrl: true },
+  });
+  res.json({ csvData: updated!.csvData as typeof parsed, csvSourceUrl: updated!.csvSourceUrl });
+});
+
+/** Save published CSV link without fetching (https only). */
+projectsRouter.put('/:id/csv-link', async (req, res) => {
+  const userId = req.user!.id;
+  const id = String(req.params.id);
+  const { url } = req.body as { url?: unknown };
+  const project = await prisma.project.findFirst({ where: { id, userId } });
+  if (!project) {
+    res.status(404).json({ error: 'Project not found' });
+    return;
+  }
+  if (url === null || url === '') {
+    await prisma.project.update({ where: { id }, data: { csvSourceUrl: null } });
+    res.json({ csvSourceUrl: null });
+    return;
+  }
+  if (typeof url !== 'string') {
+    res.status(400).json({ error: 'url must be string or null' });
+    return;
+  }
+  let href: string;
+  try {
+    href = assertHttpsCsvUrl(url);
+  } catch (e) {
+    res.status(400).json({ error: e instanceof Error ? e.message : 'Invalid URL' });
+    return;
+  }
+  await prisma.project.update({ where: { id }, data: { csvSourceUrl: href } });
+  res.json({ csvSourceUrl: href });
+});
+
+/** Fetch CSV from saved URL or body `url` (server-side; avoids browser CORS). */
+projectsRouter.post('/:id/csv/refresh', async (req, res) => {
+  const userId = req.user!.id;
+  const id = String(req.params.id);
+  const { url } = req.body as { url?: unknown };
+  const project = await prisma.project.findFirst({ where: { id, userId } });
+  if (!project) {
+    res.status(404).json({ error: 'Project not found' });
+    return;
+  }
+  const raw =
+    typeof url === 'string' && url.trim()
+      ? url.trim()
+      : project.csvSourceUrl ?? null;
+  if (!raw) {
+    res.status(400).json({ error: 'Set a CSV link or pass url in the request body' });
+    return;
+  }
+  let href: string;
+  try {
+    href = assertHttpsCsvUrl(raw);
+  } catch (e) {
+    res.status(400).json({ error: e instanceof Error ? e.message : 'Invalid URL' });
+    return;
+  }
+  let text: string;
+  try {
+    const r = await fetch(href, {
+      redirect: 'follow',
+      headers: { 'User-Agent': 'CardboardForge/1.0', Accept: 'text/csv,*/*' },
+    });
+    if (!r.ok) {
+      res.status(502).json({ error: `Fetch failed: ${r.status} ${r.statusText}` });
+      return;
+    }
+    text = await r.text();
+  } catch (e) {
+    req.log?.warn({ err: e, href }, 'csv.refresh fetch failed');
+    res.status(502).json({ error: 'Could not download CSV from URL' });
+    return;
+  }
+  const parsedRaw = parseCsvText(text);
+  const parsed = parseCsvPayload(parsedRaw);
+  if (!parsed) {
+    res.status(400).json({ error: 'CSV did not contain a valid header row' });
+    return;
+  }
+  await prisma.project.update({
+    where: { id },
+    data: { csvData: parsed, csvSourceUrl: href },
+  });
+  res.json({ csvData: parsed, csvSourceUrl: href });
 });
 
 /** Project detail: metadata, csvData, layouts summary */
@@ -206,6 +316,7 @@ projectsRouter.get('/:id', async (req, res) => {
       id: true,
       name: true,
       csvData: true,
+      csvSourceUrl: true,
       createdAt: true,
       updatedAt: true,
       layouts: {

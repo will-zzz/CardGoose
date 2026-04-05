@@ -14,6 +14,7 @@ type ProjectDetail = {
   id: string;
   name: string;
   csvData: CsvData | null;
+  csvSourceUrl: string | null;
   layouts: { id: string; name: string; lastUpdated: string }[];
 };
 type LayoutFull = { id: string; name: string; lastUpdated: string; state: unknown };
@@ -35,6 +36,7 @@ export function ProjectPage() {
   const [artKey, setArtKey] = useState('');
   const [file, setFile] = useState<File | null>(null);
   const [csvFile, setCsvFile] = useState<File | null>(null);
+  const [csvUrlDraft, setCsvUrlDraft] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
 
@@ -64,6 +66,7 @@ export function ProjectPage() {
       apiJson<{ layouts: LayoutFull[] }>(`/api/projects/${id}/layouts`, { token }),
     ]);
     setProject(proj.project);
+    setCsvUrlDraft(proj.project.csvSourceUrl ?? '');
     let list = lays.layouts;
     if (list.length === 0) {
       const created = await apiJson<{ layout: LayoutFull }>(`/api/projects/${id}/layouts`, {
@@ -133,12 +136,22 @@ export function ProjectPage() {
       if (parsed.headers.length === 0) {
         throw new Error('CSV must include a header row');
       }
-      const { csvData: next } = await apiJson<{ csvData: CsvData }>(`/api/projects/${id}/data`, {
-        method: 'PUT',
-        token,
-        body: JSON.stringify(parsed),
-      });
-      if (project) setProject({ ...project, csvData: next });
+      const res = await apiJson<{ csvData: CsvData; csvSourceUrl?: string | null }>(
+        `/api/projects/${id}/data`,
+        {
+          method: 'PUT',
+          token,
+          body: JSON.stringify({ ...parsed, sourceUrl: null }),
+        },
+      );
+      if (project) {
+        setProject({
+          ...project,
+          csvData: res.csvData,
+          csvSourceUrl: res.csvSourceUrl ?? null,
+        });
+        setCsvUrlDraft(res.csvSourceUrl ?? '');
+      }
       setCsvFile(null);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Import failed');
@@ -170,6 +183,59 @@ export function ProjectPage() {
       await loadPipeline();
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Upload failed');
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function saveCsvLink() {
+    if (!token || !id) return;
+    setBusy(true);
+    setError(null);
+    try {
+      const trimmed = csvUrlDraft.trim();
+      const { csvSourceUrl } = await apiJson<{ csvSourceUrl: string | null }>(
+        `/api/projects/${id}/csv-link`,
+        {
+          method: 'PUT',
+          token,
+          body: JSON.stringify({ url: trimmed || null }),
+        },
+      );
+      if (project) setProject({ ...project, csvSourceUrl });
+      setCsvUrlDraft(csvSourceUrl ?? '');
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Save link failed');
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function refreshCsvFromUrl() {
+    if (!token || !id) return;
+    setBusy(true);
+    setError(null);
+    try {
+      const res = await apiJson<{ csvData: CsvData; csvSourceUrl: string }>(
+        `/api/projects/${id}/csv/refresh`,
+        {
+          method: 'POST',
+          token,
+          body: JSON.stringify({
+            url: csvUrlDraft.trim() || undefined,
+          }),
+        },
+      );
+      if (project) {
+        setProject({
+          ...project,
+          csvData: res.csvData,
+          csvSourceUrl: res.csvSourceUrl,
+        });
+      }
+      setCsvUrlDraft(res.csvSourceUrl);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Refresh failed');
     } finally {
       setBusy(false);
     }
@@ -323,6 +389,32 @@ export function ProjectPage() {
       {tab === 'data' && (
         <section className="section">
           <h2>CSV data</h2>
+          <p className="muted" style={{ maxWidth: 560 }}>
+            Paste a <strong>published CSV link</strong> from Google Sheets (File → Share → Publish to web →
+            CSV). The API fetches it server-side so browser CORS is not an issue. Save the link, then use
+            Refresh to pull the latest rows.
+          </p>
+          <div className="stack" style={{ maxWidth: 560 }}>
+            <label>
+              Published CSV URL (https only)
+              <input
+                type="url"
+                autoComplete="off"
+                placeholder="https://docs.google.com/spreadsheets/d/.../export?format=csv&gid=..."
+                value={csvUrlDraft}
+                onChange={(e) => setCsvUrlDraft(e.target.value)}
+              />
+            </label>
+            <div className="inline-form">
+              <button type="button" disabled={busy} onClick={() => void saveCsvLink()}>
+                Save link
+              </button>
+              <button type="button" disabled={busy} onClick={() => void refreshCsvFromUrl()}>
+                Refresh data
+              </button>
+            </div>
+          </div>
+          <h3>Or upload a file</h3>
           <form onSubmit={importCsv} className="stack" style={{ maxWidth: 480 }}>
             <label>
               CSV file

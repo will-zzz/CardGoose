@@ -24,7 +24,7 @@ import {
   insertAfterSiblingDeep,
   isLocked,
   isVisible,
-  moveSibling,
+  moveNodeInTree,
   removeNodeById,
   updateNodeInState,
 } from '../lib/layoutTree';
@@ -159,8 +159,8 @@ function EditorNode({
               ...node,
               x,
               y,
-              width: Math.max(4, node.width * sx),
-              height: Math.max(4, node.height * sy),
+              width: Math.round(Math.max(4, node.width * sx) * 100) / 100,
+              height: Math.round(Math.max(4, node.height * sy) * 100) / 100,
               rotation,
             };
           }),
@@ -169,8 +169,8 @@ function EditorNode({
         onChange(
           updateNodeInState(state, id, (node) => {
             if (node.type !== 'text') return node;
-            const w = Math.max(24, (node.width ?? 100) * sx);
-            const fs = Math.max(8, (node.fontSize ?? 16) * sy);
+            const w = Math.round(Math.max(24, (node.width ?? 100) * sx) * 100) / 100;
+            const fs = Math.round(Math.max(8, (node.fontSize ?? 16) * sy) * 100) / 100;
             return { ...node, x, y, width: w, fontSize: fs, rotation };
           }),
         );
@@ -484,6 +484,7 @@ export function LayoutEditor({
                 Text template
                 <textarea
                   rows={4}
+                  placeholder="Card Name or {{ColumnHeader}}"
                   value={selected.text}
                   onChange={(e) => updateSelected({ text: e.target.value })}
                 />
@@ -494,9 +495,10 @@ export function LayoutEditor({
                   type="number"
                   min={8}
                   max={72}
-                  value={selected.fontSize ?? 16}
+                  step={1}
+                  value={Math.round(selected.fontSize ?? 16)}
                   onChange={(e) =>
-                    updateSelected({ fontSize: Number(e.target.value) || 16 })
+                    updateSelected({ fontSize: Math.round(Number(e.target.value) || 16) })
                   }
                 />
               </label>
@@ -721,8 +723,9 @@ export function LayoutEditor({
           onToggleVisible={toggleVisible}
           onToggleLock={toggleLock}
           onToggleCollapse={toggleCollapse}
-          onMoveUp={(id) => onChange({ ...state, root: moveSibling(state.root, id, -1) })}
-          onMoveDown={(id) => onChange({ ...state, root: moveSibling(state.root, id, 1) })}
+          onMoveNode={(dragId, targetId, placement) =>
+            onChange({ ...state, root: moveNodeInTree(state.root, dragId, targetId, placement) })
+          }
         />
       </div>
     </div>

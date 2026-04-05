@@ -24,6 +24,8 @@ model Project {
   userId    String   @map("user_id") @db.Uuid
   name      String
   csvData   Json?    @map("csv_data")
+  /// Published CSV URL (e.g. Google Sheets) for server-side refresh
+  csvSourceUrl String? @map("csv_source_url")
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")
 
