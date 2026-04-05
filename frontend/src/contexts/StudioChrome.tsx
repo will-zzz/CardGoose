@@ -6,37 +6,37 @@ import {
   useState,
   type ReactNode,
 } from 'react';
-import type { LayoutEditorChrome, ProjectChromeHint } from './studioChromeTypes';
+import type { LayoutEditorChrome, ProjectViewNavState } from './studioChromeTypes';
 
 type StudioChromeValue = {
   layoutEditor: LayoutEditorChrome | null;
   setLayoutEditorChrome: (next: LayoutEditorChrome | null) => void;
-  projectHint: ProjectChromeHint | null;
-  setProjectHint: (next: ProjectChromeHint | null) => void;
+  projectViewNav: ProjectViewNavState | null;
+  setProjectViewNav: (next: ProjectViewNavState | null) => void;
 };
 
 const StudioChromeContext = createContext<StudioChromeValue | null>(null);
 
 export function StudioChromeProvider({ children }: { children: ReactNode }) {
   const [layoutEditor, setLayoutEditor] = useState<LayoutEditorChrome | null>(null);
-  const [projectHint, setProjectHint] = useState<ProjectChromeHint | null>(null);
+  const [projectViewNav, setProjectViewNav] = useState<ProjectViewNavState | null>(null);
 
   const setLayoutEditorChrome = useCallback((next: LayoutEditorChrome | null) => {
     setLayoutEditor(next);
   }, []);
 
-  const setProjectHintStable = useCallback((next: ProjectChromeHint | null) => {
-    setProjectHint(next);
+  const setProjectViewNavStable = useCallback((next: ProjectViewNavState | null) => {
+    setProjectViewNav(next);
   }, []);
 
   const value = useMemo(
     () => ({
       layoutEditor,
       setLayoutEditorChrome,
-      projectHint,
-      setProjectHint: setProjectHintStable,
+      projectViewNav,
+      setProjectViewNav: setProjectViewNavStable,
     }),
-    [layoutEditor, setLayoutEditorChrome, projectHint, setProjectHintStable],
+    [layoutEditor, setLayoutEditorChrome, projectViewNav, setProjectViewNavStable],
   );
 
   return (

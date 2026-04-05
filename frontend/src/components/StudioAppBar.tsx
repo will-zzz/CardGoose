@@ -1,29 +1,40 @@
-import { useRef, useState } from 'react';
+import { useRef, useState, type ReactNode } from 'react';
 import {
+  Box,
   CheckCircle2,
   ChevronDown,
+  ChevronRight,
   CircleAlert,
   Loader2,
-  LogOut,
   User,
 } from 'lucide-react';
-import { Link, useLocation } from 'react-router-dom';
+import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/useAuth';
 import { useStudioChrome } from '../contexts/StudioChrome';
+import type { ProjectTab } from '../contexts/studioChromeTypes';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from './ui/dropdown-menu';
 
-function MenuDropdown({
+function AppMenu({
   label,
   children,
 }: {
   label: string;
-  children: React.ReactNode;
+  children: (close: () => void) => ReactNode;
 }) {
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
+  const close = () => setOpen(false);
 
   return (
     <div
-      className="studio-menubar-item"
+      className="app-menu-item"
       ref={ref}
       onBlur={(e) => {
         if (!ref.current?.contains(e.relatedTarget)) setOpen(false);
@@ -31,186 +42,426 @@ function MenuDropdown({
     >
       <button
         type="button"
-        className="studio-menubar-trigger"
+        className="app-menu-trigger"
         aria-expanded={open}
         onClick={() => setOpen((o) => !o)}
       >
         {label}
-        <ChevronDown size={14} strokeWidth={2} aria-hidden className="studio-menubar-chevron" />
       </button>
       {open && (
-        <div className="studio-menubar-panel" role="menu">
-          {children}
+        <div className="app-menu-panel" role="menu">
+          {children(close)}
         </div>
       )}
     </div>
   );
 }
 
-export function StudioAppBar() {
+function AccountMenu() {
   const { user, logout } = useAuth();
-  const location = useLocation();
-  const { layoutEditor, projectHint } = useStudioChrome();
-  const projectRoute = location.pathname.match(/^\/projects\/([^/]+)/);
-  const projectId = projectRoute?.[1];
+  const navigate = useNavigate();
 
   return (
-    <header className="studio-app-bar" role="banner">
-      <div className="studio-app-bar-row studio-app-bar-row--primary">
-        <Link to="/" className="studio-brand" onClick={(e) => layoutEditor?.onNavigateHomeClick(e)}>
-          CardboardForge Studio
-        </Link>
+    <DropdownMenu>
+      <DropdownMenuTrigger asChild>
+        <button type="button" className="account-menu-trigger" aria-label="Account menu">
+          <User size={16} strokeWidth={2} aria-hidden />
+          <span className="account-menu-email">{user?.username ?? 'Account'}</span>
+          <ChevronDown size={14} strokeWidth={2} aria-hidden className="account-menu-chevron" />
+        </button>
+      </DropdownMenuTrigger>
+      <DropdownMenuContent align="end">
+        <DropdownMenuLabel className="dropdown-menu-label-muted">
+          Signed in as {user?.username}
+        </DropdownMenuLabel>
+        <DropdownMenuSeparator />
+        <DropdownMenuItem className="dropdown-menu-item-row" onSelect={() => navigate('/')}>
+          Profile
+        </DropdownMenuItem>
+        <DropdownMenuSeparator />
+        <DropdownMenuItem
+          className="dropdown-menu-item-row dropdown-menu-item-danger"
+          onSelect={() => logout()}
+        >
+          Log out
+        </DropdownMenuItem>
+      </DropdownMenuContent>
+    </DropdownMenu>
+  );
+}
 
-        <nav className="studio-menubar" aria-label="Application menu">
-          <MenuDropdown label="File">
-            <button type="button" className="studio-menubar-option" disabled role="menuitem">
-              New layout…
-            </button>
-            <Link
-              to="/"
-              className="studio-menubar-option studio-menubar-option--link"
-              role="menuitem"
-              onClick={(e) => layoutEditor?.onNavigateHomeClick(e)}
-            >
-              All projects
-            </Link>
-          </MenuDropdown>
-          <MenuDropdown label="Edit">
-            <span className="studio-menubar-hint">Use ⌘Z / ⌘⇧Z in the layout canvas</span>
-          </MenuDropdown>
+/** Account on project route — includes sheets status */
+function AccountMenuProject({
+  projectId,
+  hasPublishedSheet,
+}: {
+  projectId: string;
+  hasPublishedSheet: boolean;
+}) {
+  const { user, logout } = useAuth();
+  const navigate = useNavigate();
+
+  return (
+    <DropdownMenu>
+      <DropdownMenuTrigger asChild>
+        <button type="button" className="account-menu-trigger" aria-label="Account menu">
+          <User size={16} strokeWidth={2} aria-hidden />
+          <span className="account-menu-email">{user?.username ?? 'Account'}</span>
+          <ChevronDown size={14} strokeWidth={2} aria-hidden className="account-menu-chevron" />
+        </button>
+      </DropdownMenuTrigger>
+      <DropdownMenuContent align="end">
+        <DropdownMenuLabel className="dropdown-menu-label-muted">
+          Signed in as {user?.username}
+        </DropdownMenuLabel>
+        <p className="dropdown-menu-info">
+          Sheets:{' '}
+          <span className={hasPublishedSheet ? 'dropdown-menu-sheets-ok' : ''}>
+            {hasPublishedSheet ? 'Linked' : 'Not set'}
+          </span>
+        </p>
+        <DropdownMenuSeparator />
+        <DropdownMenuItem
+          className="dropdown-menu-item-row"
+          onSelect={() => navigate('/')}
+        >
+          Profile
+        </DropdownMenuItem>
+        <DropdownMenuItem
+          className="dropdown-menu-item-row"
+          onSelect={() => navigate(`/projects/${projectId}?tab=pipeline`)}
+        >
+          Project settings
+        </DropdownMenuItem>
+        <DropdownMenuSeparator />
+        <DropdownMenuItem
+          className="dropdown-menu-item-row dropdown-menu-item-danger"
+          onSelect={() => logout()}
+        >
+          Log out
+        </DropdownMenuItem>
+      </DropdownMenuContent>
+    </DropdownMenu>
+  );
+}
+
+function DashboardBar() {
+  const { layoutEditor } = useStudioChrome();
+
+  return (
+    <header className="studio-shell-header studio-shell-header--dash" role="banner">
+      <div className="studio-shell-row">
+        <Link
+          to="/"
+          className="studio-shell-brand"
+          onClick={(e) => layoutEditor?.onNavigateHomeClick(e)}
+        >
+          <span className="studio-shell-logo" aria-hidden>
+            <Box size={20} strokeWidth={2} />
+          </span>
+          <span className="studio-shell-brand-text">CardboardForge</span>
+        </Link>
+        <div className="studio-shell-fill" aria-hidden />
+        <AccountMenu />
+      </div>
+    </header>
+  );
+}
+
+function ProjectTabsBar() {
+  const { projectViewNav } = useStudioChrome();
+  const projectId = projectViewNav?.projectId;
+  if (!projectId) return null;
+
+  const tab = projectViewNav.tab;
+  const navigateTab = projectViewNav.navigateTab;
+  const projectName = projectViewNav.projectName;
+  const hasSheet = projectViewNav.hasPublishedSheet;
+  const onNavigateHomeClick = projectViewNav.onNavigateHomeClick;
+
+  const items: { id: ProjectTab; label: string }[] = [
+    { id: 'cards', label: 'Cards' },
+    { id: 'layout', label: 'Layouts' },
+    { id: 'data', label: 'Data' },
+    { id: 'pipeline', label: 'Assets & export' },
+  ];
+
+  return (
+    <header className="studio-shell-header studio-shell-header--project" role="banner">
+      <div className="studio-shell-row studio-shell-row--project">
+        <div className="studio-shell-left">
           <Link
             to="/"
-            className={`studio-menubar-link${location.pathname === '/' ? ' studio-menubar-link--active' : ''}`}
-            onClick={(e) => layoutEditor?.onNavigateHomeClick(e)}
+            className="studio-shell-brand studio-shell-brand--compact"
+            onClick={(e) => onNavigateHomeClick(e)}
           >
-            Projects
+            <span className="studio-shell-logo" aria-hidden>
+              <Box size={20} strokeWidth={2} />
+            </span>
           </Link>
-          {projectId && (
-            <Link to={`/projects/${projectId}?tab=data`} className="studio-menubar-link">
-              Data sources
-            </Link>
-          )}
+          <span className="studio-shell-project-name">{projectName}</span>
+        </div>
+
+        <nav className="project-tabs-nav" aria-label="Project sections">
+          {items.map(({ id, label }) => (
+            <button
+              key={id}
+              type="button"
+              role="tab"
+              aria-selected={tab === id}
+              className={`project-tab${tab === id ? ' project-tab--active' : ''}`}
+              onClick={() => navigateTab(id)}
+            >
+              {label}
+            </button>
+          ))}
         </nav>
 
-        <div className="studio-app-bar-spacer" aria-hidden />
+        <div className="studio-shell-right">
+          <AccountMenuProject projectId={projectId} hasPublishedSheet={hasSheet} />
+        </div>
+      </div>
+    </header>
+  );
+}
 
-        {layoutEditor && (
-          <div className="studio-layout-chrome" role="group" aria-label="Layout editor">
-            <label className="studio-layout-name-wrap">
-              <span className="studio-layout-name-label">Layout</span>
-              <input
-                type="text"
-                className="studio-layout-name-input"
-                value={layoutEditor.layoutName}
-                onChange={(e) => layoutEditor.onLayoutNameChange(e.target.value)}
-                disabled={layoutEditor.busy}
-                placeholder="Name"
-                aria-label="Layout name"
-              />
-            </label>
-            <div
-              className={`studio-save-pill${layoutEditor.layoutIsDirty ? ' studio-save-pill--dirty' : ''}`}
-              role="status"
-              aria-live="polite"
-            >
-              {layoutEditor.busy ? (
-                <>
-                  <Loader2 className="studio-save-icon studio-save-icon--spin" aria-hidden />
-                  Saving…
-                </>
-              ) : layoutEditor.layoutIsDirty ? (
-                <>
-                  <CircleAlert className="studio-save-icon" aria-hidden />
-                  Unsaved
-                </>
-              ) : (
-                <>
-                  <CheckCircle2 className="studio-save-icon" aria-hidden />
-                  Saved
-                  {layoutEditor.lastSavedAt && (
-                    <span className="studio-save-time">
-                      {layoutEditor.lastSavedAt.toLocaleTimeString(undefined, {
-                        hour: 'numeric',
-                        minute: '2-digit',
-                      })}
-                    </span>
-                  )}
-                </>
-              )}
-            </div>
-            <button
-              type="button"
-              className="studio-btn studio-btn--ghost"
-              onClick={layoutEditor.onExit}
-              disabled={layoutEditor.busy}
-            >
-              Exit editor
-            </button>
-            <button
-              type="button"
-              className="studio-btn studio-btn--accent"
-              onClick={() => void layoutEditor.onSave()}
-              disabled={layoutEditor.busy || layoutEditor.saveDisabled}
-              title="Save (⌘S / Ctrl+S)"
-            >
-              Save
-            </button>
-            <button
-              type="button"
-              className="studio-btn studio-btn--ghost"
-              onClick={() => void layoutEditor.onSaveAndExit()}
-              disabled={layoutEditor.busy || layoutEditor.saveDisabled}
-            >
-              Save &amp; exit
-            </button>
-            <button
-              type="button"
-              className="studio-btn studio-btn--ghost"
-              onClick={() => void layoutEditor.onExport()}
-              disabled={layoutEditor.busy}
-            >
-              Export
-            </button>
-            <button
-              type="button"
-              className="studio-btn studio-btn--prototype"
-              onClick={() => {
-                window.alert('Physical prototype ordering will be available in a future release.');
-              }}
-            >
-              Order physical prototype
-            </button>
+function ProjectLoadingBar() {
+  return (
+    <header className="studio-shell-header studio-shell-header--project" role="banner">
+      <div className="studio-shell-row studio-shell-row--project">
+        <div className="studio-shell-left">
+          <Link to="/" className="studio-shell-brand studio-shell-brand--compact">
+            <span className="studio-shell-logo" aria-hidden>
+              <Box size={20} strokeWidth={2} />
+            </span>
+          </Link>
+          <span className="studio-shell-project-name studio-shell-project-name--muted">Loading…</span>
+        </div>
+        <div className="studio-shell-fill" aria-hidden />
+        <AccountMenu />
+      </div>
+    </header>
+  );
+}
+
+function EditorBar() {
+  const { layoutEditor } = useStudioChrome();
+  if (!layoutEditor) return null;
+
+  const le = layoutEditor;
+
+  return (
+    <header className="studio-shell-header studio-shell-header--editor" role="banner">
+      <div className="studio-shell-row studio-shell-row--editor-main">
+        <div className="editor-breadcrumb">
+          <Link
+            to="/"
+            className="studio-shell-brand studio-shell-brand--compact"
+            onClick={(e) => le.onNavigateHomeClick(e)}
+            aria-label="Home"
+          >
+            <span className="studio-shell-logo" aria-hidden>
+              <Box size={18} strokeWidth={2} />
+            </span>
+          </Link>
+          <ChevronRight size={14} className="editor-bc-sep" aria-hidden />
+          <Link
+            to={`/projects/${le.projectId}?tab=cards`}
+            className="editor-bc-link"
+            onClick={(e) => le.onNavigateToProjectCardsClick(e)}
+          >
+            {le.projectName}
+          </Link>
+          <ChevronRight size={14} className="editor-bc-sep" aria-hidden />
+          <input
+            type="text"
+            className="editor-bc-input"
+            value={le.layoutName}
+            onChange={(e) => le.onLayoutNameChange(e.target.value)}
+            disabled={le.busy}
+            aria-label="Layout name"
+          />
+        </div>
+
+        <div className="editor-bar-status-save">
+          <div
+            className={`editor-save-status${le.layoutIsDirty ? ' editor-save-status--dirty' : ''}`}
+            role="status"
+            aria-live="polite"
+          >
+            <span
+              className={`editor-save-dot${le.layoutIsDirty ? '' : ' editor-save-dot--ok'}`}
+              aria-hidden
+            />
+            {le.busy ? (
+              <>
+                <Loader2 className="editor-save-icon-spin" size={14} aria-hidden />
+                Saving…
+              </>
+            ) : le.layoutIsDirty ? (
+              <>
+                <CircleAlert size={14} aria-hidden />
+                Unsaved changes
+              </>
+            ) : (
+              <>
+                <CheckCircle2 size={14} aria-hidden />
+                All changes saved
+                {le.lastSavedAt && (
+                  <span className="editor-save-time">
+                    {le.lastSavedAt.toLocaleTimeString(undefined, {
+                      hour: 'numeric',
+                      minute: '2-digit',
+                    })}
+                  </span>
+                )}
+              </>
+            )}
           </div>
-        )}
-
-        <div className="studio-app-bar-account">
-          {projectId && (
-            <Link
-              to={`/projects/${projectId}?tab=data`}
-              className={`studio-sync-badge${
-                projectHint?.projectId === projectId && projectHint.hasPublishedSheet
-                  ? ' studio-sync-badge--ok'
-                  : ''
-              }`}
-              title="Open Data tab to manage Google Sheets link"
-            >
-              Sheets{' '}
-              {projectHint?.projectId === projectId && projectHint.hasPublishedSheet
-                ? 'linked'
-                : 'not set'}
-            </Link>
-          )}
-          <span className="studio-user">
-            <User size={14} strokeWidth={2} aria-hidden />
-            {user?.username}
-          </span>
-          <button type="button" className="studio-btn studio-btn--ghost studio-btn--icon-text" onClick={logout}>
-            <LogOut size={16} strokeWidth={2} aria-hidden />
-            Log out
+          <button
+            type="button"
+            className="editor-btn-secondary"
+            onClick={() => void le.onSaveAndExit()}
+            disabled={le.busy || le.saveDisabled}
+          >
+            Save &amp; exit
           </button>
         </div>
       </div>
 
+      <div className="studio-shell-row studio-shell-row--editor-menus">
+        <div className="editor-menus">
+          <AppMenu label="File">
+            {(close) => (
+              <>
+                <button
+                  type="button"
+                  className="app-menu-option"
+                  role="menuitem"
+                  onClick={() => {
+                    close();
+                    le.onSave();
+                  }}
+                  disabled={le.busy || le.saveDisabled}
+                >
+                  Save
+                </button>
+                <button
+                  type="button"
+                  className="app-menu-option"
+                  role="menuitem"
+                  onClick={() => {
+                    close();
+                    void le.onSaveAs();
+                  }}
+                  disabled={le.busy}
+                >
+                  Save as…
+                </button>
+                <button
+                  type="button"
+                  className="app-menu-option"
+                  role="menuitem"
+                  onClick={() => {
+                    close();
+                    le.onResetToLastSync();
+                  }}
+                  disabled={le.busy}
+                >
+                  Reset to last sync
+                </button>
+                <button
+                  type="button"
+                  className="app-menu-option"
+                  role="menuitem"
+                  onClick={() => {
+                    close();
+                    le.onCloseEditor();
+                  }}
+                  disabled={le.busy}
+                >
+                  Close editor
+                </button>
+              </>
+            )}
+          </AppMenu>
+          <AppMenu label="Edit">
+            {(close) => (
+              <>
+                <button
+                  type="button"
+                  className="app-menu-option"
+                  role="menuitem"
+                  onClick={() => {
+                    close();
+                    le.onEditUndo();
+                  }}
+                  disabled={!le.canUndo}
+                >
+                  Undo
+                </button>
+                <button
+                  type="button"
+                  className="app-menu-option"
+                  role="menuitem"
+                  onClick={() => {
+                    close();
+                    le.onEditRedo();
+                  }}
+                  disabled={!le.canRedo}
+                >
+                  Redo
+                </button>
+                <button
+                  type="button"
+                  className="app-menu-option"
+                  role="menuitem"
+                  onClick={() => {
+                    close();
+                    le.onEditSelectAll();
+                  }}
+                >
+                  Select all
+                </button>
+                <button
+                  type="button"
+                  className="app-menu-option"
+                  role="menuitem"
+                  onClick={() => {
+                    close();
+                    le.onEditClearCanvas();
+                  }}
+                  disabled={le.busy}
+                >
+                  Clear canvas
+                </button>
+              </>
+            )}
+          </AppMenu>
+        </div>
+      </div>
     </header>
   );
+}
+
+export function StudioAppBar() {
+  const location = useLocation();
+  const { layoutEditor, projectViewNav } = useStudioChrome();
+  const projectRoute = location.pathname.match(/^\/projects\/([^/]+)/);
+  const projectId = projectRoute?.[1];
+  const tabParam = new URLSearchParams(location.search).get('tab') || 'cards';
+  const isLayoutRoute = projectId && tabParam === 'layout' && layoutEditor;
+
+  if (isLayoutRoute) {
+    return <EditorBar />;
+  }
+
+  if (projectId) {
+    if (projectViewNav) {
+      return <ProjectTabsBar />;
+    }
+    return <ProjectLoadingBar />;
+  }
+
+  return <DashboardBar />;
 }

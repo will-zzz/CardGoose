@@ -1,4 +1,13 @@
-import { useCallback, useEffect, useLayoutEffect, useRef, useMemo, useState } from 'react';
+import {
+  forwardRef,
+  useCallback,
+  useEffect,
+  useImperativeHandle,
+  useLayoutEffect,
+  useRef,
+  useMemo,
+  useState,
+} from 'react';
 import type { ReactNode } from 'react';
 import type Konva from 'konva';
 import type { KonvaEventObject } from 'konva/lib/Node';
@@ -325,20 +334,26 @@ function propsInspectorTitle(node: LayoutElement | null): string {
   return 'Shape';
 }
 
-export function LayoutEditor({
-  state,
-  onChange,
-  assetUrls,
-  sampleRow,
-  deckRows = [],
-}: {
+export type LayoutEditorHandle = {
+  undo: () => void;
+  redo: () => void;
+  selectAll: () => void;
+  clearCanvas: () => void;
+};
+
+type LayoutEditorProps = {
   state: LayoutStateV2;
   onChange: (next: LayoutStateV2) => void;
   assetUrls: Record<string, string>;
   sampleRow: Record<string, string>;
-  /** Rows used for the bottom deck filmstrip; empty uses a single placeholder row */
   deckRows?: Record<string, string>[];
-}) {
+  onCapabilitiesChange?: (c: { canUndo: boolean; canRedo: boolean }) => void;
+};
+
+export const LayoutEditor = forwardRef<LayoutEditorHandle, LayoutEditorProps>(function LayoutEditor(
+  { state, onChange, assetUrls, sampleRow, deckRows = [], onCapabilitiesChange },
+  ref,
+) {
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [canUndo, setCanUndo] = useState(false);
   const [canRedo, setCanRedo] = useState(false);
@@ -378,6 +393,28 @@ export function LayoutEditor({
     setCanUndo(true);
     onChange(next);
   }, [state, onChange]);
+
+  useImperativeHandle(
+    ref,
+    () => ({
+      undo: () => undo(),
+      redo: () => redo(),
+      selectAll: () => {
+        const last = state.root[state.root.length - 1];
+        setSelectedId(last?.id ?? null);
+      },
+      clearCanvas: () => {
+        if (!window.confirm('Remove all elements from the canvas?')) return;
+        commit({ ...state, root: [] });
+        setSelectedId(null);
+      },
+    }),
+    [undo, redo, state, commit],
+  );
+
+  useEffect(() => {
+    onCapabilitiesChange?.({ canUndo, canRedo });
+  }, [canUndo, canRedo, onCapabilitiesChange]);
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
@@ -821,7 +858,7 @@ export function LayoutEditor({
                         anchorStroke="#ecfdf5"
                         anchorFill="#059669"
                         anchorSize={8}
-                        boundBoxFunc={(oldBox, newBox) => newBox}
+                        boundBoxFunc={(_oldBox, newBox) => newBox}
                       />
                     </Layer>
                   </Stage>
@@ -877,4 +914,4 @@ export function LayoutEditor({
       </div>
     </div>
   );
-}
+});

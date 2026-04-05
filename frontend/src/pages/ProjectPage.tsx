@@ -2,6 +2,7 @@ import {
   useCallback,
   useEffect,
   useMemo,
+  useRef,
   useState,
   type FormEvent,
 } from 'react';
@@ -10,12 +11,13 @@ import { apiBase, apiJson } from '../lib/api';
 import { useAuth } from '../contexts/useAuth';
 import { parseCsvText } from '../lib/csv';
 import { CardFace } from '../components/CardFace';
-import { LayoutEditor } from '../components/LayoutEditor';
+import { LayoutEditor, type LayoutEditorHandle } from '../components/LayoutEditor';
 import {
   defaultLayoutState,
   ensureLayoutState,
   type LayoutStateV2,
 } from '../types/layout';
+import type { ProjectTab } from '../contexts/studioChromeTypes';
 import { useStudioChrome } from '../contexts/StudioChrome';
 
 function cloneLayoutState(s: LayoutStateV2): LayoutStateV2 {
@@ -34,15 +36,16 @@ type ProjectDetail = {
 };
 type LayoutFull = { id: string; name: string; lastUpdated: string; state: unknown };
 
-type Tab = 'data' | 'layout' | 'cards' | 'pipeline';
-
 export function ProjectPage() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
-  const { setLayoutEditorChrome, setProjectHint } = useStudioChrome();
+  const { setLayoutEditorChrome, setProjectViewNav } = useStudioChrome();
   const { token } = useAuth();
-  const [tab, setTab] = useState<Tab>('cards');
+  const [tab, setTab] = useState<ProjectTab>('cards');
+  const layoutEditorRef = useRef<LayoutEditorHandle>(null);
+  const [editorCaps, setEditorCaps] = useState({ canUndo: false, canRedo: false });
+  const [layoutMountNonce, setLayoutMountNonce] = useState(0);
   const [project, setProject] = useState<ProjectDetail | null>(null);
   const [layoutsFull, setLayoutsFull] = useState<LayoutFull[]>([]);
   const [activeLayoutId, setActiveLayoutId] = useState<string | null>(null);
@@ -115,21 +118,6 @@ export function ProjectPage() {
   useEffect(() => {
     void loadCore().catch((err) => setError(err instanceof Error ? err.message : 'Load failed'));
   }, [loadCore]);
-
-  useEffect(() => {
-    if (!id) return;
-    setProjectHint({
-      projectId: id,
-      hasPublishedSheet: Boolean(project?.csvSourceUrl?.trim()),
-    });
-  }, [id, project?.csvSourceUrl, setProjectHint]);
-
-  useEffect(
-    () => () => {
-      setProjectHint(null);
-    },
-    [setProjectHint],
-  );
 
   useEffect(() => {
     if (tab === 'layout') {
@@ -227,11 +215,14 @@ export function ProjectPage() {
   }, [tab, saveLayout]);
 
   const navigateTab = useCallback(
-    (next: Tab) => {
+    (next: ProjectTab) => {
+      if (tab === 'layout' && layoutIsDirty && next !== 'layout') {
+        if (!window.confirm('You have unsaved changes. Leave the layout editor?')) return;
+      }
       setTab(next);
       setSearchParams({ tab: next }, { replace: true });
     },
-    [setSearchParams],
+    [tab, layoutIsDirty, setSearchParams],
   );
 
   useEffect(() => {
@@ -240,6 +231,82 @@ export function ProjectPage() {
       setTab(t);
     }
   }, [searchParams]);
+
+  useEffect(() => {
+    if (!id || !project || tab === 'layout') {
+      setProjectViewNav(null);
+      return;
+    }
+    setProjectViewNav({
+      projectId: id,
+      projectName: project.name,
+      tab,
+      hasPublishedSheet: Boolean(project.csvSourceUrl?.trim()),
+      navigateTab,
+      onNavigateHomeClick,
+    });
+    return () => setProjectViewNav(null);
+  }, [id, project, tab, navigateTab, onNavigateHomeClick, setProjectViewNav]);
+
+  const onNavigateToProjectCardsClick = useCallback(
+    (e: React.MouseEvent<HTMLAnchorElement>) => {
+      e.preventDefault();
+      if (layoutIsDirty) {
+        if (!window.confirm('You have unsaved changes. Leave the layout editor?')) return;
+      }
+      navigateTab('cards');
+    },
+    [layoutIsDirty, navigateTab],
+  );
+
+  const resetToLastSync = useCallback(() => {
+    if (!savedBaseline) return;
+    if (
+      layoutIsDirty &&
+      !window.confirm('Discard unsaved changes and revert to the last saved version?')
+    ) {
+      return;
+    }
+    setEditorState(cloneLayoutState(savedBaseline.state));
+    setLayoutName(savedBaseline.name);
+    setLayoutMountNonce((n) => n + 1);
+  }, [savedBaseline, layoutIsDirty]);
+
+  const saveLayoutAs = useCallback(async () => {
+    if (!token || !id) return;
+    const suggested = `${layoutName.trim() || 'Layout'} copy`;
+    const name = window.prompt('New layout name', suggested);
+    if (!name?.trim()) return;
+    setBusy(true);
+    setError(null);
+    try {
+      const { layout } = await apiJson<{ layout: LayoutFull }>(`/api/projects/${id}/layouts`, {
+        method: 'POST',
+        token,
+        body: JSON.stringify({ name: name.trim(), state: editorState }),
+      });
+      const nextState = ensureLayoutState(layout.state);
+      setLayoutsFull((prev) => [...prev, layout]);
+      setActiveLayoutId(layout.id);
+      setLayoutName(layout.name);
+      setEditorState(nextState);
+      setSavedBaseline({ name: layout.name.trim(), state: cloneLayoutState(nextState) });
+      setLastSavedAt(new Date());
+      if (project) {
+        setProject({
+          ...project,
+          layouts: [
+            ...project.layouts,
+            { id: layout.id, name: layout.name, lastUpdated: layout.lastUpdated },
+          ],
+        });
+      }
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Save as failed');
+    } finally {
+      setBusy(false);
+    }
+  }, [token, id, layoutName, editorState, project]);
 
   const exitLayoutEditor = useCallback(() => {
     if (layoutIsDirty) {
@@ -398,21 +465,28 @@ export function ProjectPage() {
     }
     setLayoutEditorChrome({
       projectId: id,
+      projectName: project?.name ?? 'Project',
       layoutName,
       onLayoutNameChange: setLayoutName,
+      onNavigateHomeClick,
+      onNavigateToProjectCardsClick,
       onSave: () => {
         void saveLayout();
       },
+      onSaveAs: () => {
+        void saveLayoutAs();
+      },
+      onResetToLastSync: resetToLastSync,
+      onCloseEditor: exitLayoutEditor,
+      onEditUndo: () => layoutEditorRef.current?.undo(),
+      onEditRedo: () => layoutEditorRef.current?.redo(),
+      onEditSelectAll: () => layoutEditorRef.current?.selectAll(),
+      onEditClearCanvas: () => layoutEditorRef.current?.clearCanvas(),
+      canUndo: editorCaps.canUndo,
+      canRedo: editorCaps.canRedo,
       onSaveAndExit: () => {
         void saveLayoutAndExit();
       },
-      onExit: exitLayoutEditor,
-      onExport: () => {
-        void onExport();
-      },
-      onNavigateHomeClick,
-      dataTabHref: `/projects/${id}?tab=data`,
-      hasPublishedSheet: Boolean(project?.csvSourceUrl?.trim()),
       busy,
       layoutIsDirty,
       lastSavedAt,
@@ -423,17 +497,21 @@ export function ProjectPage() {
     id,
     tab,
     layoutName,
+    project?.name,
     busy,
     layoutIsDirty,
     lastSavedAt,
     activeLayoutId,
-    project?.csvSourceUrl,
     setLayoutEditorChrome,
     saveLayout,
     saveLayoutAndExit,
+    saveLayoutAs,
+    resetToLastSync,
     exitLayoutEditor,
-    onExport,
     onNavigateHomeClick,
+    onNavigateToProjectCardsClick,
+    editorCaps.canUndo,
+    editorCaps.canRedo,
   ]);
 
   if (!id) return <p>Invalid project</p>;
@@ -446,45 +524,11 @@ export function ProjectPage() {
       className={`page project-dashboard${tab === 'layout' ? ' project-dashboard--layout-tab' : ''}`}
     >
       {tab !== 'layout' && (
-        <>
-          <h1>{project?.name ?? 'Project'}</h1>
-          <p className="muted">ID: {id}</p>
-        </>
+        <p className="muted page-project-meta">
+          Project ID: <code>{id}</code>
+        </p>
       )}
       {error && <p className="error">{error}</p>}
-
-      {tab !== 'layout' && (
-        <div className="tabs" role="tablist" aria-label="Project sections">
-          <button
-            type="button"
-            className={tab === 'cards' ? 'active' : ''}
-            onClick={() => navigateTab('cards')}
-          >
-            Cards
-          </button>
-          <button
-            type="button"
-            className={tab === 'layout' ? 'active' : ''}
-            onClick={() => navigateTab('layout')}
-          >
-            Layout
-          </button>
-          <button
-            type="button"
-            className={tab === 'data' ? 'active' : ''}
-            onClick={() => navigateTab('data')}
-          >
-            Data
-          </button>
-          <button
-            type="button"
-            className={tab === 'pipeline' ? 'active' : ''}
-            onClick={() => navigateTab('pipeline')}
-          >
-            Assets & export
-          </button>
-        </div>
-      )}
 
       {tab === 'cards' && (
         <section className="section">
@@ -542,11 +586,14 @@ export function ProjectPage() {
         <section className="layout-fullscreen" aria-label="Card layout editor">
           {activeLayout && (
             <LayoutEditor
+              ref={layoutEditorRef}
+              key={`${activeLayoutId ?? 'x'}-${layoutMountNonce}`}
               state={editorState}
               onChange={setEditorState}
               assetUrls={assetUrls}
               sampleRow={sampleRow}
               deckRows={csvData?.rows ?? []}
+              onCapabilitiesChange={setEditorCaps}
             />
           )}
         </section>
