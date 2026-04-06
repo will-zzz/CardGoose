@@ -180,7 +180,7 @@ function ProjectTabsBar() {
 
   const items: { id: ProjectTab; label: string }[] = [
     { id: 'cards', label: 'Cards' },
-    { id: 'layout', label: 'Layouts' },
+    { id: 'layouts', label: 'Layouts' },
     { id: 'data', label: 'Data' },
     { id: 'pipeline', label: 'Assets & export' },
   ];

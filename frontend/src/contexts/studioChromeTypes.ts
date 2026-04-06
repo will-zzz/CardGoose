@@ -28,7 +28,7 @@ export type LayoutEditorChrome = {
   onSaveAndExit: () => void;
 };
 
-export type ProjectTab = 'data' | 'layout' | 'cards' | 'pipeline';
+export type ProjectTab = 'data' | 'layout' | 'layouts' | 'cards' | 'pipeline';
 
 /** Navbar for /projects/:id when not in layout editor */
 export type ProjectViewNavState = {

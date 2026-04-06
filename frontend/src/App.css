@@ -79,7 +79,8 @@ body.layout-editor-open .main.main-wide {
 }
 
 /* Cards tab: sit closer to the studio nav */
-.main-wide:has(.cards-tab-section) {
+.main-wide:has(.cards-tab-section),
+.main-wide:has(.layouts-tab-section) {
   padding-top: 10px;
 }
 
@@ -119,6 +120,55 @@ body.layout-editor-open .main.main-wide {
 .project-list a {
   color: var(--text-h);
   font-weight: 500;
+}
+
+.layouts-list-head {
+  justify-content: space-between;
+  width: 100%;
+}
+
+.layouts-list-panel h1 {
+  margin: 0;
+  font-size: 1.5rem;
+}
+
+.layout-project-list .layout-list-row-hit {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 6px 10px;
+  margin: -6px 0;
+  border: none;
+  border-radius: 8px;
+  background: transparent;
+  font: inherit;
+  text-align: left;
+  color: var(--text-h);
+  font-weight: 500;
+  cursor: pointer;
+}
+
+.layout-project-list .layout-list-row-hit:hover:not(:disabled) {
+  background: rgba(255, 255, 255, 0.05);
+}
+
+.layout-project-list .layout-list-row-hit:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.layout-list-name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.layout-list-updated {
+  flex-shrink: 0;
+  font-size: 12px;
 }
 
 .link-danger {
@@ -212,7 +262,7 @@ button[type='submit'],
     .card-group-meta-chip
   ):not(.card-group-icon-btn):not(.card-group-add-slot):not(.card-group-title-hit):not(
     .card-group-url-drawer-save
-  ):not(.card-group-url-drawer-cancel):not(.card-group-url-drawer-shortcut) {
+  ):not(.card-group-url-drawer-cancel):not(.card-group-url-drawer-shortcut):not(.layout-list-row-hit) {
   padding: 10px 14px;
   border-radius: 6px;
   border: 1px solid var(--accent-border);

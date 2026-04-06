@@ -11,6 +11,7 @@ import { apiBase, apiJson } from '../lib/api';
 import { useAuth } from '../contexts/useAuth';
 import { parseCsvText } from '../lib/csv';
 import { CardGroupsPanel } from '../components/CardGroupsPanel';
+import { LayoutsListPanel } from '../components/LayoutsListPanel';
 import { LayoutEditor, type LayoutEditorHandle } from '../components/LayoutEditor';
 import {
   defaultLayoutState,
@@ -237,9 +238,101 @@ export function ProjectPage() {
     [layoutsFull, layoutIsDirty, navigateTab],
   );
 
+  const createLayoutFromList = useCallback(
+    async (layoutName: string) => {
+      if (!token || !id) return;
+      setBusy(true);
+      setError(null);
+      try {
+        const { layout } = await apiJson<{ layout: LayoutFull }>(`/api/projects/${id}/layouts`, {
+          method: 'POST',
+          token,
+          body: JSON.stringify({ name: layoutName.trim(), state: defaultLayoutState() }),
+        });
+        setLayoutsFull((prev) => [...prev, layout]);
+        if (project) {
+          setProject({
+            ...project,
+            layouts: [
+              ...project.layouts,
+              { id: layout.id, name: layout.name, lastUpdated: layout.lastUpdated },
+            ],
+          });
+        }
+      } catch (err) {
+        setError(err instanceof Error ? err.message : 'Create failed');
+        throw err;
+      } finally {
+        setBusy(false);
+      }
+    },
+    [token, id, project],
+  );
+
+  const deleteLayout = useCallback(
+    async (layoutId: string) => {
+      if (!token || !id) return;
+      if (
+        !window.confirm(
+          'Delete this layout? Card groups that use it will no longer be linked to a layout.',
+        )
+      ) {
+        return;
+      }
+      setBusy(true);
+      setError(null);
+      try {
+        await apiJson(`/api/projects/${id}/layouts/${layoutId}`, { method: 'DELETE', token });
+        const nextList = layoutsFull.filter((l) => l.id !== layoutId);
+        if (nextList.length === 0) {
+          const { layout } = await apiJson<{ layout: LayoutFull }>(`/api/projects/${id}/layouts`, {
+            method: 'POST',
+            token,
+            body: JSON.stringify({ name: 'Default', state: defaultLayoutState() }),
+          });
+          setLayoutsFull([layout]);
+          setActiveLayoutId(layout.id);
+          setLayoutName(layout.name);
+          const st = ensureLayoutState(layout.state);
+          setEditorState(st);
+          setSavedBaseline({ name: layout.name.trim(), state: cloneLayoutState(st) });
+          setLastSavedAt(null);
+          if (project) {
+            setProject({
+              ...project,
+              layouts: [{ id: layout.id, name: layout.name, lastUpdated: layout.lastUpdated }],
+            });
+          }
+        } else {
+          setLayoutsFull(nextList);
+          if (project) {
+            setProject({
+              ...project,
+              layouts: project.layouts.filter((x) => x.id !== layoutId),
+            });
+          }
+          if (activeLayoutId === layoutId) {
+            const pick = nextList[0];
+            setActiveLayoutId(pick.id);
+            setLayoutName(pick.name);
+            const st = ensureLayoutState(pick.state);
+            setEditorState(st);
+            setSavedBaseline({ name: pick.name.trim(), state: cloneLayoutState(st) });
+            setLastSavedAt(null);
+          }
+        }
+      } catch (err) {
+        setError(err instanceof Error ? err.message : 'Delete failed');
+      } finally {
+        setBusy(false);
+      }
+    },
+    [token, id, layoutsFull, activeLayoutId, project],
+  );
+
   useEffect(() => {
     const t = searchParams.get('tab');
-    if (t === 'cards' || t === 'layout' || t === 'data' || t === 'pipeline') {
+    if (t === 'cards' || t === 'layout' || t === 'layouts' || t === 'data' || t === 'pipeline') {
       setTab(t);
     }
   }, [searchParams]);
@@ -552,6 +645,23 @@ export function ProjectPage() {
             onBusy={setBusy}
             onError={setError}
             onOpenLayoutInEditor={openLayoutInEditor}
+          />
+        </section>
+      )}
+
+      {tab === 'layouts' && (
+        <section className="section layouts-tab-section">
+          <LayoutsListPanel
+            layouts={layoutsFull.map((l) => ({
+              id: l.id,
+              name: l.name,
+              lastUpdated: l.lastUpdated,
+            }))}
+            busy={busy}
+            onError={setError}
+            onOpenLayout={openLayoutInEditor}
+            onCreateLayout={createLayoutFromList}
+            onDeleteLayout={deleteLayout}
           />
         </section>
       )}
