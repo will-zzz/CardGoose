@@ -4,6 +4,12 @@ variable "aws_region" {
   default     = "us-east-1"
 }
 
+variable "skip_aws_credential_validation" {
+  description = "Skip STS credential check. Set true only for CI `terraform validate` without AWS keys; always false for real plans and applies."
+  type        = bool
+  default     = false
+}
+
 variable "environment" {
   description = "Name suffix for AWS resources (e.g. cardboardforge-prod-*)."
   type        = string
