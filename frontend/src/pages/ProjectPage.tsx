@@ -46,6 +46,8 @@ export function ProjectPage() {
   const { token } = useAuth();
   const [tab, setTab] = useState<ProjectTab>('cards');
   const layoutEditorRef = useRef<LayoutEditorHandle>(null);
+  /** Refresh exports list while a queued PDF may still be processing */
+  const exportPollRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const [editorCaps, setEditorCaps] = useState({ canUndo: false, canRedo: false });
   const [layoutMountNonce, setLayoutMountNonce] = useState(0);
   const [project, setProject] = useState<ProjectDetail | null>(null);
@@ -560,20 +562,43 @@ export function ProjectPage() {
     setExportPdfStatus(null);
     setError(null);
     try {
-      const res = await apiJson<{ ok?: boolean; s3Key?: string }>(
-        `/api/projects/${id}/export-pdf-direct`,
+      await apiJson<{ queued: boolean; projectId: string; timestamp: string }>(
+        `/api/projects/${id}/export-pdf`,
         { method: 'POST', token, body: JSON.stringify({ dpi: exportPdfDpi }) },
       );
-      const shortKey = res.s3Key?.split('/').pop() ?? res.s3Key ?? 'export';
-      setExportPdfStatus(`PDF ready: ${shortKey}`);
+      setExportPdfStatus(
+        'Export queued — the PDF will show in the list below when the worker finishes (you can keep working).',
+      );
       await loadPipeline();
-      window.setTimeout(() => setExportPdfStatus(null), 8000);
+      if (exportPollRef.current) {
+        clearInterval(exportPollRef.current);
+        exportPollRef.current = null;
+      }
+      let ticks = 0;
+      exportPollRef.current = window.setInterval(() => {
+        ticks += 1;
+        void loadPipeline();
+        if (ticks >= 15) {
+          if (exportPollRef.current) clearInterval(exportPollRef.current);
+          exportPollRef.current = null;
+        }
+      }, 8000);
+      window.setTimeout(() => setExportPdfStatus(null), 12_000);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Export failed');
     } finally {
       setExportPdfLoading(false);
     }
   }, [token, id, loadPipeline, exportPdfDpi]);
+
+  useEffect(() => {
+    return () => {
+      if (exportPollRef.current) {
+        clearInterval(exportPollRef.current);
+        exportPollRef.current = null;
+      }
+    };
+  }, []);
 
   useEffect(() => {
     if (!id || tab !== 'layout') {
@@ -802,8 +827,9 @@ export function ProjectPage() {
           <section className="section">
             <h2>Export PDF</h2>
             <p className="muted" style={{ maxWidth: 560 }}>
-              Runs the Python worker on this machine via the API (skips SQS). Ensure dependencies are
-              installed and <code>RENDER_URL</code> points at this app&apos;s dev server.
+              Enqueues on SQS — the request finishes quickly while a worker renders the PDF. Run{' '}
+              <code>python -m baker.main</code> (or your ECS worker) with <code>RENDER_URL</code> set to
+              this dev server.
             </p>
             <label className="stack" style={{ maxWidth: 360, marginBottom: 12 }}>
               <span>
@@ -836,7 +862,7 @@ export function ProjectPage() {
                       aria-hidden
                       style={{ verticalAlign: 'middle', marginRight: 6 }}
                     />
-                    Exporting…
+                    Queueing…
                   </>
                 ) : (
                   'Export PDF'
@@ -844,7 +870,7 @@ export function ProjectPage() {
               </button>
               {exportPdfLoading && (
                 <span className="muted" aria-live="polite">
-                  Rendering and uploading…
+                  Sending to queue…
                 </span>
               )}
             </div>
