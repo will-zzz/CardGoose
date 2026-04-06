@@ -396,7 +396,9 @@ export function CardGroupsPanel(props: {
                           void loadGroups();
                           return;
                         }
-                        if (v !== g.name) void updateGroup(g.id, { name: v });
+                        // Always persist on blur: g.name is updated on every keystroke, so it would
+                        // always equal v here and we'd skip the API call if we compared them.
+                        void updateGroup(g.id, { name: v });
                       }}
                       onKeyDown={(e) => {
                         if (e.key === 'Enter') (e.target as HTMLInputElement).blur();
