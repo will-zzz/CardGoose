@@ -10,7 +10,8 @@ import { useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import { apiBase, apiJson } from '../lib/api';
 import { useAuth } from '../contexts/useAuth';
 import { parseCsvText } from '../lib/csv';
-import { CardFace } from '../components/CardFace';
+import { CF_LAYOUT_ID_KEY, ensureLayoutIdColumn } from '../lib/cardLayout';
+import { CardsGallery } from '../components/CardsGallery';
 import { LayoutEditor, type LayoutEditorHandle } from '../components/LayoutEditor';
 import {
   defaultLayoutState,
@@ -127,17 +128,6 @@ export function ProjectPage() {
     return undefined;
   }, [tab]);
 
-  function selectLayout(nextId: string) {
-    const L = layoutsFull.find((l) => l.id === nextId);
-    if (!L) return;
-    const nextState = ensureLayoutState(L.state);
-    setActiveLayoutId(nextId);
-    setLayoutName(L.name);
-    setEditorState(nextState);
-    setSavedBaseline({ name: L.name.trim(), state: cloneLayoutState(nextState) });
-    setLastSavedAt(null);
-  }
-
   const saveLayout = useCallback(async (): Promise<boolean> => {
     if (!token || !id || !activeLayoutId) return false;
     setBusy(true);
@@ -223,6 +213,55 @@ export function ProjectPage() {
       setSearchParams({ tab: next }, { replace: true });
     },
     [tab, layoutIsDirty, setSearchParams],
+  );
+
+  const openLayoutInEditor = useCallback(
+    (layoutId: string) => {
+      const L = layoutsFull.find((l) => l.id === layoutId);
+      if (!L) return;
+      if (layoutIsDirty) {
+        if (
+          !window.confirm('Discard unsaved changes and open this layout in the editor?')
+        ) {
+          return;
+        }
+      }
+      const nextState = ensureLayoutState(L.state);
+      setActiveLayoutId(layoutId);
+      setLayoutName(L.name);
+      setEditorState(nextState);
+      setSavedBaseline({ name: L.name.trim(), state: cloneLayoutState(nextState) });
+      setLastSavedAt(null);
+      setLayoutMountNonce((n) => n + 1);
+      navigateTab('layout');
+    },
+    [layoutsFull, layoutIsDirty, navigateTab],
+  );
+
+  const addDataRowForLayout = useCallback(
+    async (layoutId: string) => {
+      if (!token || !id || !csvData?.headers.length) return;
+      setBusy(true);
+      setError(null);
+      try {
+        const headers = ensureLayoutIdColumn([...csvData.headers]);
+        const newRow: Record<string, string> = {};
+        for (const h of headers) {
+          newRow[h] = h === CF_LAYOUT_ID_KEY ? layoutId : '';
+        }
+        const res = await apiJson<{ csvData: CsvData }>(`/api/projects/${id}/data`, {
+          method: 'PUT',
+          token,
+          body: JSON.stringify({ headers, rows: [...csvData.rows, newRow] }),
+        });
+        if (project) setProject({ ...project, csvData: res.csvData });
+      } catch (e) {
+        setError(e instanceof Error ? e.message : 'Failed to add row');
+      } finally {
+        setBusy(false);
+      }
+    },
+    [token, id, csvData, project],
   );
 
   useEffect(() => {
@@ -521,68 +560,30 @@ export function ProjectPage() {
   if (!id) return <p>Invalid project</p>;
 
   const activeLayout = layoutsFull.find((l) => l.id === activeLayoutId) ?? null;
-  const previewState = activeLayout ? editorState : defaultLayoutState();
 
   return (
     <div
       className={`page project-dashboard${tab === 'layout' ? ' project-dashboard--layout-tab' : ''}`}
     >
-      {tab !== 'layout' && (
-        <p className="muted page-project-meta">
-          Project ID: <code>{id}</code>
-        </p>
-      )}
       {error && <p className="error">{error}</p>}
 
       {tab === 'cards' && (
-        <section className="section">
-          <h2>Card previews</h2>
-          <p className="muted">
-            Renders use the layout from the Layout tab and your imported CSV. Placeholders like{' '}
-            <code>{'{{Name}}'}</code> map to column headers.
-          </p>
-          {layoutsFull.length > 0 && (
-            <label>
-              Layout
-              <select
-                value={activeLayoutId ?? ''}
-                onChange={(e) => selectLayout(e.target.value)}
-                disabled={busy}
-              >
-                {layoutsFull.map((l) => (
-                  <option key={l.id} value={l.id}>
-                    {l.name}
-                  </option>
-                ))}
-              </select>
-            </label>
-          )}
-          {!csvData || csvData.rows.length === 0 ? (
-            <p className="muted">Import a CSV on the Data tab to see cards.</p>
-          ) : (
-            <div className="card-grid">
-              {csvData.rows.map((row, i) => {
-                const label =
-                  row.Name ||
-                  row.name ||
-                  row.Title ||
-                  row.title ||
-                  Object.values(row)[0] ||
-                  `Card ${i + 1}`;
-                return (
-                  <figure key={i} className="card-grid-item">
-                    <CardFace
-                      state={previewState}
-                      row={row}
-                      assetUrls={assetUrls}
-                      pixelWidth={200}
-                    />
-                    <figcaption title={label}>{label}</figcaption>
-                  </figure>
-                );
-              })}
-            </div>
-          )}
+        <section className="section cards-tab-section">
+          <CardsGallery
+            projectId={id}
+            token={token}
+            layoutsFull={layoutsFull}
+            csvData={csvData ?? { headers: [], rows: [] }}
+            assetUrls={assetUrls}
+            busy={busy}
+            onBusy={setBusy}
+            onError={setError}
+            onCsvUpdated={(next) => {
+              if (project) setProject({ ...project, csvData: next });
+            }}
+            onOpenLayoutInEditor={openLayoutInEditor}
+            onAddDataRowForLayout={addDataRowForLayout}
+          />
         </section>
       )}
 
