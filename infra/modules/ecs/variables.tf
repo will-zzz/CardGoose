@@ -91,7 +91,16 @@ variable "desired_count" {
 }
 
 variable "worker_render_url" {
-  description = "Public URL of the Vite app for PDF worker (e.g. CloudFront). Required for export-pdf."
+  description = "HTTPS origin the PDF worker loads for /render (CloudFront URL, no trailing slash)."
   type        = string
-  default     = ""
+}
+
+variable "cors_origin" {
+  description = "Browser origin allowed by the API (e.g. https://dxxx.cloudfront.net). Passed as CORS_ORIGIN."
+  type        = string
+}
+
+variable "target_group_arn" {
+  description = "ALB target group for the API service."
+  type        = string
 }

@@ -79,16 +79,8 @@ resource "aws_security_group" "ecs_tasks" {
 
 resource "aws_security_group" "api" {
   name        = "${local.name_prefix}-api-sg"
-  description = "API service inbound"
+  description = "API task - inbound only from ALB (see alb module ingress rule)"
   vpc_id      = aws_vpc.main.id
-
-  ingress {
-    description = "HTTP API"
-    from_port   = 3001
-    to_port     = 3001
-    protocol    = "tcp"
-    cidr_blocks = ["0.0.0.0/0"]
-  }
 
   egress {
     from_port   = 0

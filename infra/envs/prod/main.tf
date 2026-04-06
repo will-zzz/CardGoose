@@ -60,6 +60,26 @@ module "cloudwatch" {
   rds_instance_id = module.rds.db_instance_id
 }
 
+module "alb" {
+  source = "../../modules/alb"
+
+  environment           = var.environment
+  project_name          = var.project_name
+  vpc_id                = module.vpc.vpc_id
+  public_subnet_ids     = module.vpc.public_subnet_ids
+  api_security_group_id = module.vpc.api_security_group_id
+}
+
+module "frontend_static" {
+  source = "../../modules/frontend_static"
+
+  environment       = var.environment
+  project_name      = var.project_name
+  api_origin_domain = module.alb.alb_dns_name
+
+  depends_on = [module.alb]
+}
+
 module "ecs" {
   source = "../../modules/ecs"
 
@@ -85,7 +105,9 @@ module "ecs" {
   api_log_group_name          = module.cloudwatch.api_log_group_name
   worker_log_group_name       = module.cloudwatch.worker_log_group_name
   desired_count               = var.ecs_desired_count
-  worker_render_url           = var.worker_render_url
+  worker_render_url           = module.frontend_static.site_url
+  cors_origin                 = module.frontend_static.site_url
+  target_group_arn            = module.alb.target_group_arn
 
-  depends_on = [module.cloudwatch, module.rds, module.iam]
+  depends_on = [module.cloudwatch, module.rds, module.iam, module.alb, module.frontend_static]
 }

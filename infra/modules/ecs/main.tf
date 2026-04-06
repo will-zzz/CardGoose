@@ -46,6 +46,7 @@ resource "aws_ecs_task_definition" "api" {
       { name = "S3_BUCKET_ASSETS", value = var.assets_bucket_name },
       { name = "S3_BUCKET_EXPORTS", value = var.exports_bucket_name },
       { name = "JWT_SECRET", value = random_password.jwt.result },
+      { name = "CORS_ORIGIN", value = var.cors_origin },
     ]
     logConfiguration = {
       logDriver = "awslogs"
@@ -78,8 +79,8 @@ resource "aws_ecs_task_definition" "worker" {
         { name = "S3_BUCKET_ASSETS", value = var.assets_bucket_name },
         { name = "S3_BUCKET_EXPORTS", value = var.exports_bucket_name },
         { name = "PYTHONPATH", value = "/app/src" },
+        { name = "RENDER_URL", value = var.worker_render_url },
       ],
-      var.worker_render_url != "" ? [{ name = "RENDER_URL", value = var.worker_render_url }] : [],
     )
     logConfiguration = {
       logDriver = "awslogs"
@@ -99,6 +100,12 @@ resource "aws_ecs_service" "api" {
   desired_count    = var.desired_count
   launch_type      = "FARGATE"
   platform_version = "1.4.0"
+
+  load_balancer {
+    target_group_arn = var.target_group_arn
+    container_name   = "api"
+    container_port   = 3001
+  }
 
   network_configuration {
     subnets          = var.public_subnet_ids

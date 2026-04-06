@@ -491,6 +491,8 @@ button:disabled {
 
 .layout-fullscreen .layout-editor {
   margin-top: 0;
+  /* Dropdown menus in the deck drawer extend past the filmstrip; avoid clipping */
+  overflow: visible;
 }
 
 .layout-editor-shell {
@@ -2256,6 +2258,7 @@ label.layout-editor-footer-value-strip {
   transform: translateY(100%);
   transition: transform 0.28s cubic-bezier(0.4, 0, 0.2, 1);
   pointer-events: none;
+  overflow: visible;
 }
 
 .deck-preview-drawer--open {
@@ -2355,6 +2358,8 @@ label.layout-editor-footer-value-strip {
   max-height: min(42vh, 200px);
   background: rgba(22, 22, 22, 0.97);
   backdrop-filter: blur(12px);
+  /* Let the data-source menu drop below the control without clipping */
+  overflow: visible;
 }
 
 .deck-filmstrip-head {
@@ -2377,6 +2382,94 @@ label.layout-editor-footer-value-strip {
   font-size: 11px;
   color: var(--text);
   opacity: 0.85;
+}
+
+.deck-filmstrip-source-picker {
+  position: relative;
+}
+
+.deck-filmstrip-source-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 3px 8px;
+  font-size: 11px;
+  font-weight: 500;
+  color: var(--text-h);
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: background 0.15s, border-color 0.15s;
+}
+
+.deck-filmstrip-source-btn:hover {
+  background: rgba(255, 255, 255, 0.1);
+  border-color: var(--accent);
+}
+
+.deck-filmstrip-source-label {
+  max-width: 140px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.deck-filmstrip-source-chevron {
+  opacity: 0.6;
+  transition: transform 0.18s ease;
+}
+
+.deck-filmstrip-source-chevron--open {
+  transform: rotate(180deg);
+}
+
+.deck-filmstrip-source-menu {
+  position: absolute;
+  top: calc(100% + 4px);
+  bottom: auto;
+  left: 0;
+  min-width: 180px;
+  max-width: 260px;
+  max-height: min(40vh, 240px);
+  overflow-y: auto;
+  list-style: none;
+  margin: 0;
+  padding: 4px 0;
+  background: rgba(28, 28, 32, 0.98);
+  backdrop-filter: blur(12px);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  box-shadow: 0 8px 28px rgba(0, 0, 0, 0.55);
+  z-index: 40;
+}
+
+.deck-filmstrip-source-option {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 7px 12px;
+  font-size: 12px;
+  color: var(--text);
+  cursor: pointer;
+  transition: background 0.12s;
+}
+
+.deck-filmstrip-source-option:hover {
+  background: rgba(255, 255, 255, 0.06);
+  color: var(--text-h);
+}
+
+.deck-filmstrip-source-option--active {
+  color: var(--accent);
+  font-weight: 500;
+}
+
+.deck-filmstrip-source-option-count {
+  font-size: 10px;
+  opacity: 0.6;
+  flex-shrink: 0;
 }
 
 .deck-filmstrip-scroll {

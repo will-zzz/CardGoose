@@ -37,6 +37,14 @@ output "ecs_cluster_name" {
   value = module.ecs.cluster_name
 }
 
+output "ecs_api_service_name" {
+  value = module.ecs.api_service_name
+}
+
+output "ecs_worker_service_name" {
+  value = module.ecs.worker_service_name
+}
+
 output "rds_endpoint" {
   value = module.rds.db_endpoint
 }
@@ -49,4 +57,26 @@ output "rds_master_password" {
 
 output "sns_alerts_topic_arn" {
   value = module.cloudwatch.alerts_topic_arn
+}
+
+output "public_api_url" {
+  description = "Direct ALB URL (HTTP). Prefer the CloudFront URL for browsers; use this for debugging."
+  value       = "http://${module.alb.alb_dns_name}"
+}
+
+output "frontend_url" {
+  description = "Production app URL: SPA + /api/* and /health proxied to the API (set VITE_API_URL empty for same-origin)."
+  value       = module.frontend_static.site_url
+}
+
+output "frontend_bucket_name" {
+  value = module.frontend_static.bucket_name
+}
+
+output "cloudfront_distribution_id" {
+  value = module.frontend_static.cloudfront_distribution_id
+}
+
+output "alb_dns_name" {
+  value = module.alb.alb_dns_name
 }

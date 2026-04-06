@@ -37,6 +37,11 @@ type ProjectDetail = {
   layouts: { id: string; name: string; lastUpdated: string }[];
 };
 type LayoutFull = { id: string; name: string; lastUpdated: string; state: unknown };
+type CardGroupSummary = {
+  id: string;
+  name: string;
+  csvData: CsvData | null;
+};
 
 export function ProjectPage() {
   const { id } = useParams<{ id: string }>();
@@ -77,8 +82,23 @@ export function ProjectPage() {
   /** Set when a save completes in this session (for “Saved at …”) */
   const [lastSavedAt, setLastSavedAt] = useState<Date | null>(null);
 
+  const [cardGroups, setCardGroups] = useState<CardGroupSummary[]>([]);
+
   const csvData = project?.csvData ?? null;
   const sampleRow = useMemo(() => csvData?.rows[0] ?? {}, [csvData]);
+
+  const editorDataSources = useMemo(() => {
+    const sources: { id: string; label: string; rows: Record<string, string>[] }[] = [];
+    if (csvData && csvData.rows.length > 0) {
+      sources.push({ id: '__project__', label: 'Project data', rows: csvData.rows });
+    }
+    for (const g of cardGroups) {
+      if (g.csvData && g.csvData.rows.length > 0) {
+        sources.push({ id: g.id, label: g.name, rows: g.csvData.rows });
+      }
+    }
+    return sources;
+  }, [csvData, cardGroups]);
 
   const loadPipeline = useCallback(async () => {
     if (!token || !id) return;
@@ -93,6 +113,20 @@ export function ProjectPage() {
     }
     setAssetUrls(map);
     setExports(e.exports);
+  }, [token, id]);
+
+  const loadCardGroups = useCallback(async () => {
+    if (!token || !id) return;
+    try {
+      const res = await apiJson<{
+        cardGroups: { id: string; name: string; csvData: CsvData | null }[];
+      }>(`/api/projects/${id}/card-groups`, { token });
+      setCardGroups(
+        res.cardGroups.map((g) => ({ id: g.id, name: g.name, csvData: g.csvData })),
+      );
+    } catch {
+      // non-critical for layout editor; card groups just won't appear as data sources
+    }
   }, [token, id]);
 
   const loadCore = useCallback(async () => {
@@ -121,8 +155,8 @@ export function ProjectPage() {
     setEditorState(loadedState);
     setSavedBaseline({ name: first.name.trim(), state: cloneLayoutState(loadedState) });
     setLastSavedAt(null);
-    await loadPipeline();
-  }, [token, id, loadPipeline]);
+    await Promise.all([loadPipeline(), loadCardGroups()]);
+  }, [token, id, loadPipeline, loadCardGroups]);
 
   useEffect(() => {
     void loadCore().catch((err) => setError(err instanceof Error ? err.message : 'Load failed'));
@@ -714,6 +748,7 @@ export function ProjectPage() {
               assetUrls={assetUrls}
               sampleRow={sampleRow}
               deckRows={csvData?.rows ?? []}
+              dataSources={editorDataSources}
               onCapabilitiesChange={setEditorCaps}
             />
           )}

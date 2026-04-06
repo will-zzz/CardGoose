@@ -22,7 +22,7 @@ import {
   Text,
   Transformer,
 } from 'react-konva';
-import { Layers, Minus, Plus } from 'lucide-react';
+import { ChevronDown, Database, Layers, Minus, Plus } from 'lucide-react';
 import type { LayoutElement, LayoutStateV2 } from '../types/layout';
 import { DEFAULT_NEW_TEXT } from '../types/layout';
 import { applyTemplate } from '../lib/template';
@@ -390,20 +390,29 @@ export type LayoutEditorHandle = {
   zoomTo100Percent: () => void;
 };
 
+export type EditorDataSource = {
+  id: string;
+  label: string;
+  rows: Record<string, string>[];
+};
+
 type LayoutEditorProps = {
   state: LayoutStateV2;
   onChange: (next: LayoutStateV2) => void;
   assetUrls: Record<string, string>;
   sampleRow: Record<string, string>;
   deckRows?: Record<string, string>[];
+  dataSources?: EditorDataSource[];
   onCapabilitiesChange?: (c: { canUndo: boolean; canRedo: boolean }) => void;
 };
 
 export const LayoutEditor = forwardRef<LayoutEditorHandle, LayoutEditorProps>(function LayoutEditor(
-  { state, onChange, assetUrls, sampleRow, deckRows = [], onCapabilitiesChange },
+  { state, onChange, assetUrls, sampleRow, deckRows = [], dataSources = [], onCapabilitiesChange },
   ref,
 ) {
   const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [selectedDataSourceId, setSelectedDataSourceId] = useState<string | null>(null);
+  const [dataSourceMenuOpen, setDataSourceMenuOpen] = useState(false);
   const [canUndo, setCanUndo] = useState(false);
   const [canRedo, setCanRedo] = useState(false);
   const historyPast = useRef<LayoutStateV2[]>([]);
@@ -710,9 +719,16 @@ export const LayoutEditor = forwardRef<LayoutEditorHandle, LayoutEditorProps>(fu
     ],
   );
 
-  const filmstripRows = deckRows.length > 0 ? deckRows : [{}];
+  const activeSource = useMemo(
+    () => (selectedDataSourceId ? dataSources.find((s) => s.id === selectedDataSourceId) : null),
+    [selectedDataSourceId, dataSources],
+  );
+  const effectiveRows = activeSource ? activeSource.rows : deckRows;
+  const effectiveSampleRow = activeSource ? activeSource.rows[0] ?? {} : sampleRow;
+  const filmstripRows = effectiveRows.length > 0 ? effectiveRows : [{}];
   const [deckPreviewOpen, setDeckPreviewOpen] = useState(false);
   const deckDrawerId = useId();
+  const dataSourceMenuRef = useRef<HTMLDivElement>(null);
 
   const zoomOut = useCallback((e: MouseEvent<HTMLButtonElement>) => {
     const step = e.shiftKey ? ZOOM_STEP_COARSE : ZOOM_STEP_FINE;
@@ -728,6 +744,17 @@ export const LayoutEditor = forwardRef<LayoutEditorHandle, LayoutEditorProps>(fu
   const zoomInputId = useId();
 
   const bgColorInputRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    if (!dataSourceMenuOpen) return;
+    const onClick = (e: Event) => {
+      if (dataSourceMenuRef.current && !dataSourceMenuRef.current.contains(e.target as Node)) {
+        setDataSourceMenuOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', onClick);
+    return () => document.removeEventListener('mousedown', onClick);
+  }, [dataSourceMenuOpen]);
 
   const commitZoomInput = useCallback(() => {
     const raw = zoomInputDraft.trim();
@@ -977,7 +1004,7 @@ export const LayoutEditor = forwardRef<LayoutEditorHandle, LayoutEditorProps>(fu
                           node={node}
                           selectedId={selectedId}
                           assetUrls={assetUrls}
-                          sampleRow={sampleRow}
+                          sampleRow={effectiveSampleRow}
                           setNodeRef={setNodeRef}
                           onSelect={setSelectedId}
                           onChange={commit}
@@ -1026,8 +1053,69 @@ export const LayoutEditor = forwardRef<LayoutEditorHandle, LayoutEditorProps>(fu
         <div className="deck-filmstrip deck-filmstrip--overlay">
           <div className="deck-filmstrip-head">
             <span className="deck-filmstrip-title">Deck preview</span>
+            {dataSources.length > 0 && (
+              <div className="deck-filmstrip-source-picker" ref={dataSourceMenuRef}>
+                <button
+                  type="button"
+                  className="deck-filmstrip-source-btn"
+                  onClick={() => setDataSourceMenuOpen((o) => !o)}
+                  aria-haspopup="listbox"
+                  aria-expanded={dataSourceMenuOpen}
+                >
+                  <Database size={12} strokeWidth={2} aria-hidden />
+                  <span className="deck-filmstrip-source-label">
+                    {activeSource?.label ?? 'Project data'}
+                  </span>
+                  <ChevronDown
+                    size={12}
+                    strokeWidth={2}
+                    aria-hidden
+                    className={`deck-filmstrip-source-chevron${dataSourceMenuOpen ? ' deck-filmstrip-source-chevron--open' : ''}`}
+                  />
+                </button>
+                {dataSourceMenuOpen && (
+                  <ul className="deck-filmstrip-source-menu" role="listbox">
+                    <li
+                      role="option"
+                      aria-selected={!selectedDataSourceId}
+                      className={`deck-filmstrip-source-option${!selectedDataSourceId ? ' deck-filmstrip-source-option--active' : ''}`}
+                      onClick={() => {
+                        setSelectedDataSourceId(null);
+                        setDataSourceMenuOpen(false);
+                      }}
+                    >
+                      Project data
+                      <span className="deck-filmstrip-source-option-count">
+                        {deckRows.length} rows
+                      </span>
+                    </li>
+                    {dataSources
+                      .filter((s) => s.id !== '__project__')
+                      .map((s) => (
+                        <li
+                          key={s.id}
+                          role="option"
+                          aria-selected={selectedDataSourceId === s.id}
+                          className={`deck-filmstrip-source-option${selectedDataSourceId === s.id ? ' deck-filmstrip-source-option--active' : ''}`}
+                          onClick={() => {
+                            setSelectedDataSourceId(s.id);
+                            setDataSourceMenuOpen(false);
+                          }}
+                        >
+                          {s.label}
+                          <span className="deck-filmstrip-source-option-count">
+                            {s.rows.length} rows
+                          </span>
+                        </li>
+                      ))}
+                  </ul>
+                )}
+              </div>
+            )}
             <span className="deck-filmstrip-meta">
-              {deckRows.length === 0 ? 'No CSV rows — sample preview' : `${deckRows.length} cards`}
+              {effectiveRows.length === 0
+                ? 'No CSV rows — sample preview'
+                : `${effectiveRows.length} cards`}
             </span>
           </div>
           <div className="deck-filmstrip-scroll">
