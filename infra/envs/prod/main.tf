@@ -85,6 +85,7 @@ module "ecs" {
   api_log_group_name          = module.cloudwatch.api_log_group_name
   worker_log_group_name       = module.cloudwatch.worker_log_group_name
   desired_count               = var.ecs_desired_count
+  worker_render_url           = var.worker_render_url
 
   depends_on = [module.cloudwatch, module.rds, module.iam]
 }

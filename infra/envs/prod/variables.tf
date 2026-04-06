@@ -34,6 +34,12 @@ variable "ecs_desired_count" {
   default     = 1
 }
 
+variable "worker_render_url" {
+  description = "HTTPS origin the PDF worker uses to load /render (frontend URL, no trailing slash)."
+  type        = string
+  default     = ""
+}
+
 variable "rds_dev_access_cidrs" {
   description = "One or more public IPs as /32 (curl -s https://checkip.amazonaws.com) so local Prisma can reach prod RDS—e.g. home and school Wi‑Fi. Empty = RDS stays private (ECS only)."
   type        = list(string)

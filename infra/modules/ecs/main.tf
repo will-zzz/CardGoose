@@ -71,13 +71,16 @@ resource "aws_ecs_task_definition" "worker" {
     name      = "worker"
     image     = "${var.worker_repository_url}:latest"
     essential = true
-    environment = [
-      { name = "AWS_REGION", value = var.aws_region },
-      { name = "SQS_QUEUE_URL", value = var.pdf_queue_url },
-      { name = "S3_BUCKET_ASSETS", value = var.assets_bucket_name },
-      { name = "S3_BUCKET_EXPORTS", value = var.exports_bucket_name },
-      { name = "PYTHONPATH", value = "/app/src" },
-    ]
+    environment = concat(
+      [
+        { name = "AWS_REGION", value = var.aws_region },
+        { name = "SQS_QUEUE_URL", value = var.pdf_queue_url },
+        { name = "S3_BUCKET_ASSETS", value = var.assets_bucket_name },
+        { name = "S3_BUCKET_EXPORTS", value = var.exports_bucket_name },
+        { name = "PYTHONPATH", value = "/app/src" },
+      ],
+      var.worker_render_url != "" ? [{ name = "RENDER_URL", value = var.worker_render_url }] : [],
+    )
     logConfiguration = {
       logDriver = "awslogs"
       options = {

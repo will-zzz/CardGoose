@@ -1,3 +1,5 @@
+import type { Ref } from 'react';
+import type { Layer as KonvaLayer } from 'konva';
 import { Group as KonvaGroup, Image as KonvaImage, Layer, Rect, Stage, Text } from 'react-konva';
 import type { LayoutElement, LayoutStateV2 } from '../types/layout';
 import { applyTemplate } from '../lib/template';
@@ -102,11 +104,14 @@ export function CardFace({
   row,
   assetUrls,
   pixelWidth,
+  layerRef,
 }: {
   state: LayoutStateV2;
   row: Record<string, string>;
   assetUrls: Record<string, string>;
   pixelWidth: number;
+  /** For headless export: observe draw completion */
+  layerRef?: Ref<KonvaLayer>;
 }) {
   const scale = pixelWidth / state.width;
   const pixelHeight = state.height * scale;
@@ -114,7 +119,7 @@ export function CardFace({
 
   return (
     <Stage width={pixelWidth} height={pixelHeight}>
-      <Layer>
+      <Layer ref={layerRef}>
         <KonvaGroup scaleX={scale} scaleY={scale}>
           <Rect width={state.width} height={state.height} fill={bg} />
           {state.root.map((node) => (

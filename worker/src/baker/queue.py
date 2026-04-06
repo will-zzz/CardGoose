@@ -77,11 +77,28 @@ def poll_forever(
                 payload = json.loads(raw)
                 if isinstance(payload, dict):
                     logger.info(
-                        "Received export job message keys=%s projectId=%s userId=%s",
-                        list(payload.keys()),
+                        "SQS message: type=%s payloadS3Key=%s projectId=%s keys=%s",
+                        payload.get("type"),
+                        payload.get("payloadS3Key"),
                         payload.get("projectId"),
-                        payload.get("userId"),
+                        list(payload.keys())[:12],
                     )
+                    vis = (
+                        300
+                        if (
+                            payload.get("type") == "export-pdf"
+                            or payload.get("payloadS3Key")
+                        )
+                        else 60
+                    )
+                    try:
+                        sqs.change_message_visibility(
+                            QueueUrl=url,
+                            ReceiptHandle=receipt,
+                            VisibilityTimeout=vis,
+                        )
+                    except Exception:
+                        logger.exception("change_message_visibility failed (continuing)")
                     handler(payload)
                 else:
                     raise ValueError("Message body must be a JSON object")

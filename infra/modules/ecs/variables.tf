@@ -89,3 +89,9 @@ variable "desired_count" {
   type        = number
   default     = 0
 }
+
+variable "worker_render_url" {
+  description = "Public URL of the Vite app for PDF worker (e.g. CloudFront). Required for export-pdf."
+  type        = string
+  default     = ""
+}

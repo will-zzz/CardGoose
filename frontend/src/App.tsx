@@ -5,6 +5,7 @@ import { StudioChromeProvider } from './contexts/StudioChrome';
 import { DashboardPage } from './pages/DashboardPage';
 import { LoginPage } from './pages/LoginPage';
 import { ProjectPage } from './pages/ProjectPage';
+import { RenderPage } from './pages/RenderPage';
 import './App.css';
 
 function ProtectedLayout() {
@@ -32,6 +33,7 @@ export default function App() {
   return (
     <Routes>
       <Route path="/login" element={<LoginPage />} />
+      <Route path="/render" element={<RenderPage />} />
       <Route element={<ProtectedLayout />}>
         <Route path="/" element={<DashboardPage />} />
         <Route path="/projects/:id" element={<ProjectPage />} />

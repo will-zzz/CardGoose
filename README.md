@@ -78,7 +78,13 @@ Variables already set in your shell override `.env.local`. Set `LOG_LEVEL=DEBUG`
 
 **What is local vs cloud:** the browser, Vite, Node API, and Python worker are **local**. RDS, S3, and SQS are **AWS**. The API talks to RDS, S3, and SQS; the worker polls SQS and writes export artifacts to S3.
 
-**Smoke test:** register, create a project, upload a file, **Trigger export**. With the worker running, the export list should show a JSON result after a few seconds.
+**PDF export:** add **`RENDER_URL`** to `.env.local` (no trailing slash). It must be the **exact origin Vite prints** (e.g. `Local: http://localhost:5174/` when port 5173 is already in use—if Playwright points at the wrong port, the job can hang until timeout and nothing new appears in S3). Use `http://host.docker.internal:5174` if the worker runs in Docker and Vite on the host. Restart the worker after changing it.
+
+**Same SQS queue as production:** your `.env.local` often uses the **prod** `SQS_QUEUE_URL`. If the **ECS worker** service in AWS is running (`desired_count` ≥ 1), it **shares the queue** with your laptop—messages may be processed in the cloud (or fail there) while your local worker sits idle with no logs. For local PDF debugging, set the ECS **worker** service desired count to **0** (console or Terraform), then run `PYTHONPATH=src python3 -m baker.main` locally. Scale ECS back up when done.
+
+If exports stay empty: check **SQS** approximate messages visible / in flight in the AWS console, **CloudWatch** logs for the ECS worker task, and local worker logs for `SQS message:` / `PDF render start`.
+
+**Smoke test (legacy JSON):** the old `POST /export` path still enqueues a tiny JSON status file for queue testing.
 
 **If Prisma cannot reach RDS** (`Can't reach database server at …rds.amazonaws.com`): add your current public IP as a `/32` entry in `rds_dev_access_cidrs` in `infra/envs/prod/terraform.tfvars`, run `terraform apply`, and confirm `DATABASE_URL` in `.env.local` matches `terraform output -raw rds_endpoint`.
 

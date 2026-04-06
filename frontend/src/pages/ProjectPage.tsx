@@ -20,6 +20,7 @@ import {
 } from '../types/layout';
 import type { ProjectTab } from '../contexts/studioChromeTypes';
 import { useStudioChrome } from '../contexts/StudioChrome';
+import { Loader2 } from 'lucide-react';
 
 function cloneLayoutState(s: LayoutStateV2): LayoutStateV2 {
   return JSON.parse(JSON.stringify(s)) as LayoutStateV2;
@@ -61,6 +62,9 @@ export function ProjectPage() {
   const [csvUrlDraft, setCsvUrlDraft] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  /** Pipeline tab: PDF export bypasses SQS and can take a while */
+  const [exportPdfLoading, setExportPdfLoading] = useState(false);
+  const [exportPdfStatus, setExportPdfStatus] = useState<string | null>(null);
   /** Last known persisted snapshot for dirty detection */
   const [savedBaseline, setSavedBaseline] = useState<{
     name: string;
@@ -550,16 +554,22 @@ export function ProjectPage() {
 
   const onExport = useCallback(async () => {
     if (!token || !id) return;
-    setBusy(true);
+    setExportPdfLoading(true);
+    setExportPdfStatus(null);
     setError(null);
     try {
-      await apiJson(`/api/projects/${id}/export`, { method: 'POST', token });
-      await new Promise((r) => setTimeout(r, 500));
+      const res = await apiJson<{ ok?: boolean; s3Key?: string }>(
+        `/api/projects/${id}/export-pdf-direct`,
+        { method: 'POST', token },
+      );
+      const shortKey = res.s3Key?.split('/').pop() ?? res.s3Key ?? 'export';
+      setExportPdfStatus(`PDF ready: ${shortKey}`);
       await loadPipeline();
+      window.setTimeout(() => setExportPdfStatus(null), 8000);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Export failed');
     } finally {
-      setBusy(false);
+      setExportPdfLoading(false);
     }
   }, [token, id, loadPipeline]);
 
@@ -788,10 +798,42 @@ export function ProjectPage() {
           </section>
 
           <section className="section">
-            <h2>Export (SQS → worker)</h2>
-            <button type="button" onClick={() => void onExport()} disabled={busy}>
-              Trigger export job
-            </button>
+            <h2>Export PDF</h2>
+            <p className="muted" style={{ maxWidth: 560 }}>
+              Runs the Python worker on this machine via the API (skips SQS). Ensure dependencies are
+              installed and <code>RENDER_URL</code> points at this app&apos;s dev server.
+            </p>
+            <div className="inline-form" style={{ alignItems: 'center', gap: 10 }}>
+              <button
+                type="button"
+                onClick={() => void onExport()}
+                disabled={busy || exportPdfLoading}
+              >
+                {exportPdfLoading ? (
+                  <>
+                    <Loader2
+                      className="editor-save-icon-spin editor-save-loader"
+                      size={16}
+                      aria-hidden
+                      style={{ verticalAlign: 'middle', marginRight: 6 }}
+                    />
+                    Exporting…
+                  </>
+                ) : (
+                  'Export PDF'
+                )}
+              </button>
+              {exportPdfLoading && (
+                <span className="muted" aria-live="polite">
+                  Rendering and uploading…
+                </span>
+              )}
+            </div>
+            {exportPdfStatus && !exportPdfLoading && (
+              <p className="muted" style={{ marginTop: 8 }} aria-live="polite">
+                {exportPdfStatus}
+              </p>
+            )}
             <h3>Exports</h3>
             <ul>
               {exports.map((ex) => (
@@ -803,7 +845,9 @@ export function ProjectPage() {
               ))}
             </ul>
             {exports.length === 0 && (
-              <p className="muted">No exports yet — run worker locally or on ECS.</p>
+              <p className="muted">
+                No exports yet — run the worker with <code>RENDER_URL</code> set, or deploy to ECS.
+              </p>
             )}
           </section>
         </>

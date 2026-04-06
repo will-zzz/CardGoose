@@ -1,6 +1,10 @@
 # CardboardForge Baker (worker)
 
-Python worker that consumes SQS jobs and renders PDFs / TTS assets via Playwright.
+Python worker that consumes SQS jobs and renders **Print & Play PDFs** (via Playwright + `/render`) or legacy JSON test artifacts.
+
+### PDF export (`export-pdf`)
+
+Set **`RENDER_URL`** to the origin of your Vite app (no trailing slash), e.g. `http://host.docker.internal:5173` when the worker runs in Docker and the dev server on the host. The worker loads `{RENDER_URL}/render` and drives `window.__CF_RENDER_CARD__` to rasterize each card, then stitches pages with no gaps between cards.
 
 Install (local):
 
