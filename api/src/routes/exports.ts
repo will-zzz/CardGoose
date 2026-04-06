@@ -80,7 +80,10 @@ exportsRouter.post('/projects/:projectId/export-pdf', async (req, res) => {
   }
 
   await sendJsonMessage(message);
-  req.log.info({ projectId, userId, timestamp, inline: bodyBytes <= PAYLOAD_INLINE_MAX_BYTES }, 'exports-pdf sqs ok');
+  req.log.info(
+    { projectId, userId, timestamp, inline: bodyBytes <= PAYLOAD_INLINE_MAX_BYTES },
+    'exports-pdf sqs ok'
+  );
 
   res.json({ queued: true, projectId, timestamp });
 });
@@ -131,7 +134,7 @@ exportsRouter.post('/projects/:projectId/export-pdf-direct', async (req, res) =>
     if (result.status !== 0) {
       req.log.warn(
         { status: result.status, stderr: err, stdout: out },
-        'export-pdf-direct python failed',
+        'export-pdf-direct python failed'
       );
       try {
         const j = JSON.parse(out) as { ok?: boolean; error?: string };
@@ -169,7 +172,7 @@ exportsRouter.post('/projects/:projectId/export-pdf-direct', async (req, res) =>
           stderrChars: err.length,
           stderr: err.length > cap ? `${err.slice(0, cap)}…` : err,
         },
-        'export-pdf-direct subprocess stderr (Python baker logs; only after process exits)',
+        'export-pdf-direct subprocess stderr (Python baker logs; only after process exits)'
       );
     }
     req.log.info({ projectId, s3Key: parsed.s3Key }, 'export-pdf-direct ok');
@@ -201,7 +204,7 @@ exportsRouter.get('/projects/:projectId/exports', async (req, res) => {
     keys.map(async (key) => ({
       key,
       url: await getSignedGetUrl(bucket, key),
-    })),
+    }))
   );
 
   res.json({ exports });

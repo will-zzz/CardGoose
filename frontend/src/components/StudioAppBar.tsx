@@ -1,11 +1,5 @@
 import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react';
-import {
-  Box,
-  ChevronDown,
-  ChevronRight,
-  Loader2,
-  User,
-} from 'lucide-react';
+import { Box, ChevronDown, ChevronRight, Loader2, User } from 'lucide-react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/useAuth';
 import { useStudioChrome } from '../contexts/StudioChrome';
@@ -120,10 +114,7 @@ function AccountMenuProject({
           </span>
         </p>
         <DropdownMenuSeparator />
-        <DropdownMenuItem
-          className="dropdown-menu-item-row"
-          onSelect={() => navigate('/')}
-        >
+        <DropdownMenuItem className="dropdown-menu-item-row" onSelect={() => navigate('/')}>
           Profile
         </DropdownMenuItem>
         <DropdownMenuItem
@@ -234,7 +225,9 @@ function ProjectLoadingBar() {
               <Box size={20} strokeWidth={2} />
             </span>
           </Link>
-          <span className="studio-shell-project-name studio-shell-project-name--muted">Loading…</span>
+          <span className="studio-shell-project-name studio-shell-project-name--muted">
+            Loading…
+          </span>
         </div>
         <div className="studio-shell-fill" aria-hidden />
         <AccountMenu />
@@ -337,7 +330,11 @@ function EditorBar() {
           <div className="editor-save-status" role="status" aria-live="polite">
             {le.busy ? (
               <>
-                <Loader2 className="editor-save-icon-spin editor-save-loader" size={14} aria-hidden />
+                <Loader2
+                  className="editor-save-icon-spin editor-save-loader"
+                  size={14}
+                  aria-hidden
+                />
                 Saving…
               </>
             ) : le.layoutIsDirty ? (

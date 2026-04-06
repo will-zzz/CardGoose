@@ -134,13 +134,23 @@ function migrateV1ToV2(v1: LayoutStateV1): LayoutStateV2 {
 export function isLayoutStateV1(v: unknown): v is LayoutStateV1 {
   if (!v || typeof v !== 'object') return false;
   const o = v as LayoutStateV1;
-  return o.version === 1 && typeof o.width === 'number' && typeof o.height === 'number' && Array.isArray(o.elements);
+  return (
+    o.version === 1 &&
+    typeof o.width === 'number' &&
+    typeof o.height === 'number' &&
+    Array.isArray(o.elements)
+  );
 }
 
 export function isLayoutStateV2(v: unknown): v is LayoutStateV2 {
   if (!v || typeof v !== 'object') return false;
   const o = v as LayoutStateV2;
-  return o.version === 2 && typeof o.width === 'number' && typeof o.height === 'number' && Array.isArray(o.root);
+  return (
+    o.version === 2 &&
+    typeof o.width === 'number' &&
+    typeof o.height === 'number' &&
+    Array.isArray(o.root)
+  );
 }
 
 export function ensureLayoutState(raw: unknown): LayoutStateV2 {

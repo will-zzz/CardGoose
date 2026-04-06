@@ -11,12 +11,11 @@ export interface TokenPayload {
   username: string;
 }
 
-export function signToken(payload: TokenPayload, expiresIn: jwt.SignOptions['expiresIn'] = '7d'): string {
-  return jwt.sign(
-    { sub: payload.sub, username: payload.username },
-    SECRET(),
-    { expiresIn },
-  );
+export function signToken(
+  payload: TokenPayload,
+  expiresIn: jwt.SignOptions['expiresIn'] = '7d'
+): string {
+  return jwt.sign({ sub: payload.sub, username: payload.username }, SECRET(), { expiresIn });
 }
 
 export function verifyToken(token: string): TokenPayload {

@@ -3,8 +3,8 @@ locals {
   # AWS-managed CloudFront policies (global IDs). Use literals instead of data sources so
   # the plan does not defer reads to apply time, which triggers "inconsistent final plan"
   # on aws_cloudfront_distribution (hashicorp/aws provider).
-  cf_cache_policy_caching_optimized = "658327ea-f89d-4fab-a63d-7e88639e58f6"
-  cf_cache_policy_caching_disabled  = "4135ea2d-6df8-44a3-9df3-4b5a84be39ad"
+  cf_cache_policy_caching_optimized   = "658327ea-f89d-4fab-a63d-7e88639e58f6"
+  cf_cache_policy_caching_disabled    = "4135ea2d-6df8-44a3-9df3-4b5a84be39ad"
   cf_origin_request_policy_all_viewer = "216adef6-5c7f-47e4-b989-5492eafa07d3"
 }
 

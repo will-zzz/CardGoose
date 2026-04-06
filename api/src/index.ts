@@ -30,7 +30,7 @@ app.use(
     customSuccessMessage: (req, res) => `${req.method} ${req.url} ${res.statusCode}`,
     customErrorMessage: (req, res, err) =>
       `${req.method} ${req.url} ${res.statusCode} — ${err instanceof Error ? err.message : 'error'}`,
-  }),
+  })
 );
 
 const corsOrigin = process.env.CORS_ORIGIN;
@@ -38,7 +38,7 @@ app.use(
   cors({
     origin: corsOrigin === '*' || !corsOrigin ? true : corsOrigin.split(',').map((s) => s.trim()),
     credentials: true,
-  }),
+  })
 );
 app.use(express.json());
 
@@ -53,7 +53,11 @@ app.use('/api', exportsRouter);
 
 app.listen(port, () => {
   rootLogger.info(
-    { port, nodeEnv: process.env.NODE_ENV ?? 'development', awsEndpoint: process.env.AWS_ENDPOINT_URL ?? '(real AWS)' },
-    'API listening',
+    {
+      port,
+      nodeEnv: process.env.NODE_ENV ?? 'development',
+      awsEndpoint: process.env.AWS_ENDPOINT_URL ?? '(real AWS)',
+    },
+    'API listening'
   );
 });

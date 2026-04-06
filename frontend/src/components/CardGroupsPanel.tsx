@@ -37,17 +37,12 @@ export type CardGroupDto = {
 };
 
 function hasCsvReady(g: CardGroupDto): boolean {
-  return Boolean(
-    g.csvData && Array.isArray(g.csvData.headers) && g.csvData.headers.length > 0,
-  );
+  return Boolean(g.csvData && Array.isArray(g.csvData.headers) && g.csvData.headers.length > 0);
 }
 
 function canPreview(g: CardGroupDto): boolean {
   return Boolean(
-    g.layoutId &&
-      g.csvData &&
-      Array.isArray(g.csvData.headers) &&
-      g.csvData.headers.length > 0,
+    g.layoutId && g.csvData && Array.isArray(g.csvData.headers) && g.csvData.headers.length > 0
   );
 }
 
@@ -128,7 +123,7 @@ export function CardGroupsPanel(props: {
     try {
       const res = await apiJson<{ cardGroups: CardGroupDto[] }>(
         `/api/projects/${projectId}/card-groups`,
-        { token },
+        { token }
       );
       setGroups(res.cardGroups);
     } catch (e) {
@@ -156,7 +151,7 @@ export function CardGroupsPanel(props: {
     try {
       const res = await apiJson<{ cardGroup: CardGroupDto }>(
         `/api/projects/${projectId}/card-groups`,
-        { method: 'POST', token, body: JSON.stringify({ name: 'New group' }) },
+        { method: 'POST', token, body: JSON.stringify({ name: 'New group' }) }
       );
       setGroups((prev) => [...prev, res.cardGroup].sort((a, b) => a.sortOrder - b.sortOrder));
       setEditingTitleId(res.cardGroup.id);
@@ -175,7 +170,7 @@ export function CardGroupsPanel(props: {
       try {
         const res = await apiJson<{ cardGroup: CardGroupDto }>(
           `/api/projects/${projectId}/card-groups/${groupId}`,
-          { method: 'PUT', token, body: JSON.stringify(body) },
+          { method: 'PUT', token, body: JSON.stringify(body) }
         );
         setGroups((prev) => prev.map((g) => (g.id === groupId ? res.cardGroup : g)));
       } catch (e) {
@@ -184,7 +179,7 @@ export function CardGroupsPanel(props: {
         onBusy(false);
       }
     },
-    [token, projectId, onBusy, onError],
+    [token, projectId, onBusy, onError]
   );
 
   const deleteGroup = useCallback(
@@ -206,7 +201,7 @@ export function CardGroupsPanel(props: {
         onBusy(false);
       }
     },
-    [token, projectId, onBusy, onError, urlEditorGroupId],
+    [token, projectId, onBusy, onError, urlEditorGroupId]
   );
 
   const duplicateGroup = useCallback(
@@ -217,18 +212,16 @@ export function CardGroupsPanel(props: {
       try {
         const res = await apiJson<{ cardGroup: CardGroupDto }>(
           `/api/projects/${projectId}/card-groups/${groupId}/duplicate`,
-          { method: 'POST', token },
+          { method: 'POST', token }
         );
-        setGroups((prev) =>
-          [...prev, res.cardGroup].sort((a, b) => a.sortOrder - b.sortOrder),
-        );
+        setGroups((prev) => [...prev, res.cardGroup].sort((a, b) => a.sortOrder - b.sortOrder));
       } catch (e) {
         onError(e instanceof Error ? e.message : 'Duplicate failed');
       } finally {
         onBusy(false);
       }
     },
-    [token, projectId, onBusy, onError],
+    [token, projectId, onBusy, onError]
   );
 
   const refreshGroupCsv = useCallback(
@@ -239,7 +232,7 @@ export function CardGroupsPanel(props: {
       try {
         const res = await apiJson<{ cardGroup: CardGroupDto }>(
           `/api/projects/${projectId}/card-groups/${groupId}/csv/refresh`,
-          { method: 'POST', token, body: JSON.stringify({ url: url.trim() }) },
+          { method: 'POST', token, body: JSON.stringify({ url: url.trim() }) }
         );
         setGroups((prev) => prev.map((g) => (g.id === groupId ? res.cardGroup : g)));
       } catch (e) {
@@ -248,7 +241,7 @@ export function CardGroupsPanel(props: {
         onBusy(false);
       }
     },
-    [token, projectId, onBusy, onError],
+    [token, projectId, onBusy, onError]
   );
 
   const openUrlEditor = useCallback((g: CardGroupDto) => {
@@ -262,7 +255,7 @@ export function CardGroupsPanel(props: {
       await updateGroup(groupId, { csvSourceUrl: trimmed || null });
       setUrlEditorGroupId(null);
     },
-    [urlDraft, updateGroup],
+    [urlDraft, updateGroup]
   );
 
   const toggleGallery = useCallback((groupId: string) => {
@@ -295,7 +288,7 @@ export function CardGroupsPanel(props: {
           return blob.includes(query);
         });
     },
-    [query],
+    [query]
   );
 
   const renderAddSlot = (className?: string) => (
@@ -361,9 +354,7 @@ export function CardGroupsPanel(props: {
 
           return (
             <article key={g.id} className="card-group-shell">
-              <header
-                className={`card-group-header${ready ? ' card-group-header--ready' : ''}`}
-              >
+              <header className={`card-group-header${ready ? ' card-group-header--ready' : ''}`}>
                 <button
                   type="button"
                   className={`card-group-chevron${galleryExpanded ? ' card-group-chevron--open' : ''}`}
@@ -386,7 +377,7 @@ export function CardGroupsPanel(props: {
                       aria-label="Group name"
                       onChange={(e) =>
                         setGroups((prev) =>
-                          prev.map((x) => (x.id === g.id ? { ...x, name: e.target.value } : x)),
+                          prev.map((x) => (x.id === g.id ? { ...x, name: e.target.value } : x))
                         )
                       }
                       onBlur={(e) => {

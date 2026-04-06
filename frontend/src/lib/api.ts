@@ -15,7 +15,7 @@ export function authHeaders(token: string | null): HeadersInit {
 
 export async function apiJson<T>(
   path: string,
-  options: RequestInit & { token?: string | null } = {},
+  options: RequestInit & { token?: string | null } = {}
 ): Promise<T> {
   const { token, ...init } = options;
   const url = `${apiBase()}${path.startsWith('/') ? path : `/${path}`}`;

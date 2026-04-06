@@ -23,7 +23,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       });
       persist(data.token, data.user);
     },
-    [persist],
+    [persist]
   );
 
   const register = useCallback(
@@ -34,7 +34,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       });
       persist(data.token, data.user);
     },
-    [persist],
+    [persist]
   );
 
   const logout = useCallback(() => {
@@ -44,7 +44,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const value = useMemo(
     () => ({ token, user, login, register, logout }),
-    [token, user, login, register, logout],
+    [token, user, login, register, logout]
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

@@ -6,11 +6,7 @@ import { applyTemplate } from '../lib/template';
 import { isVisible } from '../lib/layoutTree';
 import { useImageElement } from './useImageElement';
 
-function RectEl({
-  el,
-}: {
-  el: Extract<LayoutElement, { type: 'rect' }>;
-}) {
+function RectEl({ el }: { el: Extract<LayoutElement, { type: 'rect' }> }) {
   return (
     <Rect
       x={el.x}

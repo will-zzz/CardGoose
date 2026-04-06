@@ -254,7 +254,8 @@ textarea {
 }
 
 button[type='submit'],
-.page button[type='button']:not(.link-btn):not(.link-danger):not(.zone-tool):not(.zone-row-body):not(
+.page
+  button[type='button']:not(.link-btn):not(.link-danger):not(.zone-tool):not(.zone-row-body):not(
     .layout-fullscreen-ghost-btn
   ):not(.zone-icon-btn):not(.layout-editor-footer-btn):not(.cards-layout-section-toggle):not(
     .cards-layout-change-btn
@@ -262,7 +263,9 @@ button[type='submit'],
     .card-group-meta-chip
   ):not(.card-group-icon-btn):not(.card-group-add-slot):not(.card-group-title-hit):not(
     .card-group-url-drawer-save
-  ):not(.card-group-url-drawer-cancel):not(.card-group-url-drawer-shortcut):not(.layout-list-row-hit) {
+  ):not(.card-group-url-drawer-cancel):not(.card-group-url-drawer-shortcut):not(
+    .layout-list-row-hit
+  ) {
   padding: 10px 14px;
   border-radius: 6px;
   border: 1px solid var(--accent-border);
@@ -1709,7 +1712,9 @@ button.zone-row-body:hover {
   font-size: 14px;
   font-weight: 500;
   cursor: pointer;
-  transition: background 0.12s ease, color 0.12s ease;
+  transition:
+    background 0.12s ease,
+    color 0.12s ease;
 }
 
 .project-tab:hover {
@@ -2401,7 +2406,9 @@ label.layout-editor-footer-value-strip {
   border-radius: 6px;
   cursor: pointer;
   white-space: nowrap;
-  transition: background 0.15s, border-color 0.15s;
+  transition:
+    background 0.15s,
+    border-color 0.15s;
 }
 
 .deck-filmstrip-source-btn:hover {

@@ -10,11 +10,15 @@ projectsRouter.use(requireAuth);
 const MAX_CSV_ROWS = 5000;
 const MAX_CSV_COLS = 64;
 
-function parseCsvPayload(raw: unknown): { headers: string[]; rows: Record<string, string>[] } | null {
+function parseCsvPayload(
+  raw: unknown
+): { headers: string[]; rows: Record<string, string>[] } | null {
   if (!raw || typeof raw !== 'object') return null;
   const o = raw as { headers?: unknown; rows?: unknown };
   if (!Array.isArray(o.headers) || !Array.isArray(o.rows)) return null;
-  const headers = o.headers.filter((h): h is string => typeof h === 'string' && h.length > 0).slice(0, MAX_CSV_COLS);
+  const headers = o.headers
+    .filter((h): h is string => typeof h === 'string' && h.length > 0)
+    .slice(0, MAX_CSV_COLS);
   if (headers.length === 0) return null;
   const rows: Record<string, string>[] = [];
   for (const row of o.rows) {
@@ -193,7 +197,9 @@ projectsRouter.put('/:id/data', async (req, res) => {
   };
   const parsed = parseCsvPayload(req.body);
   if (!parsed) {
-    res.status(400).json({ error: 'Body must be { headers: string[], rows: Record<string,string>[] }' });
+    res
+      .status(400)
+      .json({ error: 'Body must be { headers: string[], rows: Record<string,string>[] }' });
     return;
   }
   const data: { csvData: typeof parsed; csvSourceUrl?: string | null } = { csvData: parsed };
@@ -263,10 +269,7 @@ projectsRouter.post('/:id/csv/refresh', async (req, res) => {
     res.status(404).json({ error: 'Project not found' });
     return;
   }
-  const raw =
-    typeof url === 'string' && url.trim()
-      ? url.trim()
-      : project.csvSourceUrl ?? null;
+  const raw = typeof url === 'string' && url.trim() ? url.trim() : (project.csvSourceUrl ?? null);
   if (!raw) {
     res.status(400).json({ error: 'Set a CSV link or pass url in the request body' });
     return;
@@ -450,8 +453,8 @@ projectsRouter.put('/:id/card-groups/reorder', async (req, res) => {
       prisma.cardGroup.update({
         where: { id: gid },
         data: { sortOrder: i },
-      }),
-    ),
+      })
+    )
   );
   const groups = await prisma.cardGroup.findMany({
     where: { projectId: id },
@@ -588,10 +591,7 @@ projectsRouter.post('/:id/card-groups/:groupId/csv/refresh', async (req, res) =>
     return;
   }
   const { url } = req.body as { url?: unknown };
-  const raw =
-    typeof url === 'string' && url.trim()
-      ? url.trim()
-      : group.csvSourceUrl ?? null;
+  const raw = typeof url === 'string' && url.trim() ? url.trim() : (group.csvSourceUrl ?? null);
   if (!raw) {
     res.status(400).json({ error: 'Set a CSV URL on the group or pass url in the body' });
     return;
@@ -655,8 +655,7 @@ projectsRouter.post('/:id/card-groups/:groupId/duplicate', async (req, res) => {
     _max: { sortOrder: true },
   });
   const sortOrder = (agg._max.sortOrder ?? -1) + 1;
-  const baseName =
-    source.name.length > 100 ? `${source.name.slice(0, 97)}…` : source.name;
+  const baseName = source.name.length > 100 ? `${source.name.slice(0, 97)}…` : source.name;
   const created = await prisma.cardGroup.create({
     data: {
       projectId: id,
@@ -666,9 +665,7 @@ projectsRouter.post('/:id/card-groups/:groupId/duplicate', async (req, res) => {
       csvSourceUrl: source.csvSourceUrl,
       dataSourceLabel: source.dataSourceLabel,
       csvData:
-        source.csvData === null
-          ? Prisma.JsonNull
-          : (source.csvData as Prisma.InputJsonValue),
+        source.csvData === null ? Prisma.JsonNull : (source.csvData as Prisma.InputJsonValue),
     },
     select: {
       id: true,

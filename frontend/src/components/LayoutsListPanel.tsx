@@ -66,7 +66,9 @@ export function LayoutsListPanel(props: {
               onClick={() => onOpenLayout(l.id)}
             >
               <span className="layout-list-name">{l.name}</span>
-              <span className="muted layout-list-updated">Updated {formatUpdated(l.lastUpdated)}</span>
+              <span className="muted layout-list-updated">
+                Updated {formatUpdated(l.lastUpdated)}
+              </span>
             </button>
             <button
               type="button"
@@ -82,7 +84,9 @@ export function LayoutsListPanel(props: {
           </li>
         ))}
       </ul>
-      {layouts.length === 0 && <p className="muted">No layouts yet. Add one to design a card template.</p>}
+      {layouts.length === 0 && (
+        <p className="muted">No layouts yet. Add one to design a card template.</p>
+      )}
     </div>
   );
 }

@@ -18,10 +18,7 @@ function dpiFromEnv(): number {
 /** Client `dpi` from export request, or env default, always clamped to 150–300. */
 export function resolveExportPdfDpi(clientDpi?: unknown): number {
   if (typeof clientDpi === 'number' && Number.isFinite(clientDpi)) {
-    return Math.min(
-      EXPORT_PDF_DPI_MAX,
-      Math.max(EXPORT_PDF_DPI_MIN, Math.round(clientDpi)),
-    );
+    return Math.min(EXPORT_PDF_DPI_MAX, Math.max(EXPORT_PDF_DPI_MIN, Math.round(clientDpi)));
   }
   return dpiFromEnv();
 }
@@ -41,7 +38,7 @@ function parseCsvData(raw: unknown): CsvData | null {
 export async function buildPdfExportPayload(
   projectId: string,
   userId: string,
-  options?: { dpi?: unknown },
+  options?: { dpi?: unknown }
 ): Promise<{ payload: Record<string, unknown>; timestamp: string } | { error: string }> {
   const project = await prisma.project.findFirst({ where: { id: projectId, userId } });
   if (!project) {

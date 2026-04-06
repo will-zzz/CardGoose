@@ -1,11 +1,4 @@
-import {
-  createContext,
-  useCallback,
-  useContext,
-  useMemo,
-  useState,
-  type ReactNode,
-} from 'react';
+import { createContext, useCallback, useContext, useMemo, useState, type ReactNode } from 'react';
 import type { LayoutEditorChrome, ProjectViewNavState } from './studioChromeTypes';
 
 type StudioChromeValue = {
@@ -36,12 +29,10 @@ export function StudioChromeProvider({ children }: { children: ReactNode }) {
       projectViewNav,
       setProjectViewNav: setProjectViewNavStable,
     }),
-    [layoutEditor, setLayoutEditorChrome, projectViewNav, setProjectViewNavStable],
+    [layoutEditor, setLayoutEditorChrome, projectViewNav, setProjectViewNavStable]
   );
 
-  return (
-    <StudioChromeContext.Provider value={value}>{children}</StudioChromeContext.Provider>
-  );
+  return <StudioChromeContext.Provider value={value}>{children}</StudioChromeContext.Provider>;
 }
 
 /** Colocated hook; Fast Refresh expects components-only in some setups. */

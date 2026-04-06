@@ -15,26 +15,27 @@ export type LayoutEditorFooterButtonProps = Omit<
 /**
  * Layout editor status bar control: full-height hover/active strip, no global accent button styling.
  */
-export const LayoutEditorFooterButton = forwardRef<HTMLButtonElement, LayoutEditorFooterButtonProps>(
-  function LayoutEditorFooterButton(
-    { variant = 'default', edge = 'none', className, children, ...rest },
-    ref,
-  ) {
-    const cls = [
-      'layout-editor-footer-btn',
-      variant === 'icon' && 'layout-editor-footer-btn--icon',
-      edge === 'start' && 'layout-editor-footer-btn--edge-start',
-      className,
-    ]
-      .filter(Boolean)
-      .join(' ');
-    return (
-      <button ref={ref} type="button" className={cls} {...rest}>
-        {children}
-      </button>
-    );
-  },
-);
+export const LayoutEditorFooterButton = forwardRef<
+  HTMLButtonElement,
+  LayoutEditorFooterButtonProps
+>(function LayoutEditorFooterButton(
+  { variant = 'default', edge = 'none', className, children, ...rest },
+  ref
+) {
+  const cls = [
+    'layout-editor-footer-btn',
+    variant === 'icon' && 'layout-editor-footer-btn--icon',
+    edge === 'start' && 'layout-editor-footer-btn--edge-start',
+    className,
+  ]
+    .filter(Boolean)
+    .join(' ');
+  return (
+    <button ref={ref} type="button" className={cls} {...rest}>
+      {children}
+    </button>
+  );
+});
 
 export type LayoutEditorFooterValueStripProps = {
   /** Shown before the input (e.g. `W`, `H`). */

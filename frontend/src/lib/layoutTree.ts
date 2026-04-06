@@ -3,14 +3,14 @@ import type { LayoutElement, LayoutStateV2 } from '../types/layout';
 export function updateNodeInState(
   state: LayoutStateV2,
   id: string,
-  fn: (n: LayoutElement) => LayoutElement,
+  fn: (n: LayoutElement) => LayoutElement
 ): LayoutStateV2 {
   return { ...state, root: state.root.map((n) => (n.id === id ? fn(n) : n)) };
 }
 
 export function findNode(
   root: LayoutElement[],
-  id: string,
+  id: string
 ): { node: LayoutElement; index: number } | null {
   const index = root.findIndex((n) => n.id === id);
   if (index < 0) return null;
@@ -24,7 +24,7 @@ export function removeNodeById(root: LayoutElement[], id: string): LayoutElement
 export function insertAfterSiblingDeep(
   root: LayoutElement[],
   siblingId: string,
-  node: LayoutElement,
+  node: LayoutElement
 ): LayoutElement[] {
   const idx = root.findIndex((n) => n.id === siblingId);
   if (idx >= 0) {
@@ -36,7 +36,7 @@ export function insertAfterSiblingDeep(
 export function insertBeforeDeep(
   root: LayoutElement[],
   targetId: string,
-  node: LayoutElement,
+  node: LayoutElement
 ): LayoutElement[] {
   const idx = root.findIndex((n) => n.id === targetId);
   if (idx >= 0) {
@@ -50,7 +50,7 @@ export function moveNodeInFlatList(
   root: LayoutElement[],
   dragId: string,
   targetId: string,
-  placement: 'before' | 'after',
+  placement: 'before' | 'after'
 ): LayoutElement[] {
   if (dragId === targetId) return root;
   const extracted = root.find((n) => n.id === dragId);
@@ -77,7 +77,7 @@ export function isLocked(n: LayoutElement): boolean {
 export function applyInsert(
   state: LayoutStateV2,
   child: LayoutElement,
-  selectedId: string | null,
+  selectedId: string | null
 ): LayoutStateV2 {
   if (!selectedId) {
     return { ...state, root: [...state.root, child] };

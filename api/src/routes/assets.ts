@@ -27,7 +27,8 @@ assetsRouter.get('/projects/:projectId/assets', async (req, res) => {
     orderBy: { createdAt: 'desc' },
     select: { id: true, artKey: true, s3Key: true, createdAt: true, updatedAt: true },
   });
-  const includeUrls = String(req.query.includeUrls) === '1' || String(req.query.includeUrls) === 'true';
+  const includeUrls =
+    String(req.query.includeUrls) === '1' || String(req.query.includeUrls) === 'true';
   if (!includeUrls) {
     res.json({ assets });
     return;
@@ -37,7 +38,7 @@ assetsRouter.get('/projects/:projectId/assets', async (req, res) => {
     assets.map(async (a) => ({
       ...a,
       url: await getSignedGetUrl(bucket, a.s3Key),
-    })),
+    }))
   );
   res.json({ assets: withUrls });
 });
@@ -70,7 +71,7 @@ assetsRouter.post('/projects/:projectId/assets', upload.single('file'), async (r
   await putObject(bucket, s3Key, file.buffer, file.mimetype || 'application/octet-stream');
   req.log.info(
     { projectId, bucket, s3Key, bytes: file.buffer.length, contentType: file.mimetype },
-    'assets.upload s3 put ok',
+    'assets.upload s3 put ok'
   );
 
   const asset = await prisma.asset.upsert({

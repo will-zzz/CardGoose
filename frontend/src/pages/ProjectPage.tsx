@@ -1,11 +1,4 @@
-import {
-  useCallback,
-  useEffect,
-  useMemo,
-  useRef,
-  useState,
-  type FormEvent,
-} from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState, type FormEvent } from 'react';
 import { useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import { apiBase, apiJson } from '../lib/api';
 import { useAuth } from '../contexts/useAuth';
@@ -13,11 +6,7 @@ import { parseCsvText } from '../lib/csv';
 import { CardGroupsPanel } from '../components/CardGroupsPanel';
 import { LayoutsListPanel } from '../components/LayoutsListPanel';
 import { LayoutEditor, type LayoutEditorHandle } from '../components/LayoutEditor';
-import {
-  defaultLayoutState,
-  ensureLayoutState,
-  type LayoutStateV2,
-} from '../types/layout';
+import { defaultLayoutState, ensureLayoutState, type LayoutStateV2 } from '../types/layout';
 import type { ProjectTab } from '../contexts/studioChromeTypes';
 import { useStudioChrome } from '../contexts/StudioChrome';
 import { Loader2 } from 'lucide-react';
@@ -121,9 +110,7 @@ export function ProjectPage() {
       const res = await apiJson<{
         cardGroups: { id: string; name: string; csvData: CsvData | null }[];
       }>(`/api/projects/${id}/card-groups`, { token });
-      setCardGroups(
-        res.cardGroups.map((g) => ({ id: g.id, name: g.name, csvData: g.csvData })),
-      );
+      setCardGroups(res.cardGroups.map((g) => ({ id: g.id, name: g.name, csvData: g.csvData })));
     } catch {
       // non-critical for layout editor; card groups just won't appear as data sources
     }
@@ -181,14 +168,14 @@ export function ProjectPage() {
           method: 'PUT',
           token,
           body: JSON.stringify({ name: layoutName.trim() || 'Layout', state: editorState }),
-        },
+        }
       );
       setLayoutsFull((prev) => prev.map((l) => (l.id === layout.id ? layout : l)));
       if (project) {
         setProject({
           ...project,
           layouts: project.layouts.map((x) =>
-            x.id === layout.id ? { ...x, name: layout.name, lastUpdated: layout.lastUpdated } : x,
+            x.id === layout.id ? { ...x, name: layout.name, lastUpdated: layout.lastUpdated } : x
           ),
         });
       }
@@ -222,7 +209,7 @@ export function ProjectPage() {
         navigate('/');
       }
     },
-    [layoutIsDirty, navigate],
+    [layoutIsDirty, navigate]
   );
 
   useEffect(() => {
@@ -254,7 +241,7 @@ export function ProjectPage() {
       setTab(next);
       setSearchParams({ tab: next }, { replace: true });
     },
-    [tab, layoutIsDirty, setSearchParams],
+    [tab, layoutIsDirty, setSearchParams]
   );
 
   const openLayoutInEditor = useCallback(
@@ -262,9 +249,7 @@ export function ProjectPage() {
       const L = layoutsFull.find((l) => l.id === layoutId);
       if (!L) return;
       if (layoutIsDirty) {
-        if (
-          !window.confirm('Discard unsaved changes and open this layout in the editor?')
-        ) {
+        if (!window.confirm('Discard unsaved changes and open this layout in the editor?')) {
           return;
         }
       }
@@ -277,7 +262,7 @@ export function ProjectPage() {
       setLayoutMountNonce((n) => n + 1);
       navigateTab('layout');
     },
-    [layoutsFull, layoutIsDirty, navigateTab],
+    [layoutsFull, layoutIsDirty, navigateTab]
   );
 
   const createLayoutFromList = useCallback(
@@ -308,7 +293,7 @@ export function ProjectPage() {
         setBusy(false);
       }
     },
-    [token, id, project],
+    [token, id, project]
   );
 
   const deleteLayout = useCallback(
@@ -316,7 +301,7 @@ export function ProjectPage() {
       if (!token || !id) return;
       if (
         !window.confirm(
-          'Delete this layout? Card groups that use it will no longer be linked to a layout.',
+          'Delete this layout? Card groups that use it will no longer be linked to a layout.'
         )
       ) {
         return;
@@ -369,7 +354,7 @@ export function ProjectPage() {
         setBusy(false);
       }
     },
-    [token, id, layoutsFull, activeLayoutId, project],
+    [token, id, layoutsFull, activeLayoutId, project]
   );
 
   useEffect(() => {
@@ -403,7 +388,7 @@ export function ProjectPage() {
       }
       navigateTab('cards');
     },
-    [layoutIsDirty, navigateTab],
+    [layoutIsDirty, navigateTab]
   );
 
   const resetToLastSync = useCallback(() => {
@@ -457,9 +442,7 @@ export function ProjectPage() {
 
   const exitLayoutEditor = useCallback(() => {
     if (layoutIsDirty) {
-      const ok = window.confirm(
-        'You have unsaved changes. Leave the editor without saving?',
-      );
+      const ok = window.confirm('You have unsaved changes. Leave the editor without saving?');
       if (!ok) return;
     }
     navigateTab('cards');
@@ -491,7 +474,7 @@ export function ProjectPage() {
           method: 'PUT',
           token,
           body: JSON.stringify({ ...parsed, sourceUrl: null }),
-        },
+        }
       );
       if (project) {
         setProject({
@@ -549,7 +532,7 @@ export function ProjectPage() {
           method: 'PUT',
           token,
           body: JSON.stringify({ url: trimmed || null }),
-        },
+        }
       );
       if (project) setProject({ ...project, csvSourceUrl });
       setCsvUrlDraft(csvSourceUrl ?? '');
@@ -573,7 +556,7 @@ export function ProjectPage() {
           body: JSON.stringify({
             url: csvUrlDraft.trim() || undefined,
           }),
-        },
+        }
       );
       if (project) {
         setProject({
@@ -598,10 +581,10 @@ export function ProjectPage() {
     try {
       await apiJson<{ queued: boolean; projectId: string; timestamp: string }>(
         `/api/projects/${id}/export-pdf`,
-        { method: 'POST', token, body: JSON.stringify({ dpi: exportPdfDpi }) },
+        { method: 'POST', token, body: JSON.stringify({ dpi: exportPdfDpi }) }
       );
       setExportPdfStatus(
-        'Export queued — the PDF will show in the list below when the worker finishes (you can keep working).',
+        'Export queued — the PDF will show in the list below when the worker finishes (you can keep working).'
       );
       await loadPipeline();
       if (exportPollRef.current) {
@@ -759,9 +742,9 @@ export function ProjectPage() {
         <section className="section">
           <h2>CSV data</h2>
           <p className="muted" style={{ maxWidth: 560 }}>
-            Paste a <strong>published CSV link</strong> from Google Sheets (File → Share → Publish to web →
-            CSV). The API fetches it server-side so browser CORS is not an issue. Save the link, then use
-            Refresh to pull the latest rows.
+            Paste a <strong>published CSV link</strong> from Google Sheets (File → Share → Publish
+            to web → CSV). The API fetches it server-side so browser CORS is not an issue. Save the
+            link, then use Refresh to pull the latest rows.
           </p>
           <div className="stack" style={{ maxWidth: 560 }}>
             <label>
@@ -821,7 +804,9 @@ export function ProjectPage() {
                 </table>
               </div>
               {csvData.rows.length > 12 && (
-                <p className="muted">Showing first 12 rows. All rows are stored for card rendering.</p>
+                <p className="muted">
+                  Showing first 12 rows. All rows are stored for card rendering.
+                </p>
               )}
             </>
           )}
@@ -835,11 +820,19 @@ export function ProjectPage() {
             <form onSubmit={onUpload} className="stack">
               <label>
                 Optional art key
-                <input value={artKey} onChange={(e) => setArtKey(e.target.value)} placeholder="e.g. card-back" />
+                <input
+                  value={artKey}
+                  onChange={(e) => setArtKey(e.target.value)}
+                  placeholder="e.g. card-back"
+                />
               </label>
               <label>
                 File
-                <input type="file" onChange={(e) => setFile(e.target.files?.[0] ?? null)} required />
+                <input
+                  type="file"
+                  onChange={(e) => setFile(e.target.files?.[0] ?? null)}
+                  required
+                />
               </label>
               <button type="submit" disabled={busy}>
                 Upload to S3
@@ -863,8 +856,8 @@ export function ProjectPage() {
             <h2>Export PDF</h2>
             <p className="muted" style={{ maxWidth: 560 }}>
               Enqueues on SQS — the request finishes quickly while a worker renders the PDF. Run{' '}
-              <code>python -m baker.main</code> (or your ECS worker) with <code>RENDER_URL</code> set to
-              this dev server.
+              <code>python -m baker.main</code> (or your ECS worker) with <code>RENDER_URL</code>{' '}
+              set to this dev server.
             </p>
             <label className="stack" style={{ maxWidth: 360, marginBottom: 12 }}>
               <span>

@@ -30,12 +30,12 @@ export async function sendJsonMessage(body: Record<string, unknown>): Promise<vo
   const queueUrl = getQueueUrl();
   rootLogger.info(
     { queueUrl, messagePreview: JSON.stringify(body).slice(0, 500) },
-    'sqs.SendMessage',
+    'sqs.SendMessage'
   );
   await sqsClient.send(
     new SendMessageCommand({
       QueueUrl: queueUrl,
       MessageBody: JSON.stringify(body),
-    }),
+    })
   );
 }

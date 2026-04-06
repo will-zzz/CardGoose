@@ -29,7 +29,9 @@ function preloadUrlOnce(url: string): Promise<void> {
 }
 
 function preloadUrls(urls: string[]): Promise<void> {
-  return Promise.all(urls.map((u) => (u ? preloadUrlOnce(u) : Promise.resolve()))).then(() => undefined);
+  return Promise.all(urls.map((u) => (u ? preloadUrlOnce(u) : Promise.resolve()))).then(
+    () => undefined
+  );
 }
 
 type CardFrame = {
@@ -56,10 +58,12 @@ export function RenderPage() {
   const layerRef = useRef<KonvaLayer>(null);
   const [card, setCard] = useState<CardFrame | null>(null);
   const cardRef = useRef<CardFrame | null>(null);
-  cardRef.current = card;
-  const pendingResolve = useRef<
-    ((v: { ok: true; width: number; height: number }) => void) | null
-  >(null);
+  useLayoutEffect(() => {
+    cardRef.current = card;
+  }, [card]);
+  const pendingResolve = useRef<((v: { ok: true; width: number; height: number }) => void) | null>(
+    null
+  );
 
   const finishFrame = useCallback(() => {
     const resolve = pendingResolve.current;

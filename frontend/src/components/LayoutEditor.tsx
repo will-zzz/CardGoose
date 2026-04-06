@@ -28,10 +28,7 @@ import { DEFAULT_NEW_TEXT } from '../types/layout';
 import { applyTemplate } from '../lib/template';
 import { CardFace } from './CardFace';
 import { useImageElement } from './useImageElement';
-import {
-  LayoutEditorFooterButton,
-  LayoutEditorFooterValueStrip,
-} from './LayoutEditorFooterButton';
+import { LayoutEditorFooterButton, LayoutEditorFooterValueStrip } from './LayoutEditorFooterButton';
 import { ZoneHierarchy, type ZoneHierarchyToolbarProps } from './ZoneHierarchy';
 import {
   applyInsert,
@@ -55,7 +52,7 @@ function GridOverlay({ w, h, step }: { w: number; h: number; step: number }) {
         stroke="rgba(255,255,255,0.07)"
         strokeWidth={1}
         listening={false}
-      />,
+      />
     );
   }
   for (let y = 0; y <= h; y += step) {
@@ -66,7 +63,7 @@ function GridOverlay({ w, h, step }: { w: number; h: number; step: number }) {
         stroke="rgba(255,255,255,0.07)"
         strokeWidth={1}
         listening={false}
-      />,
+      />
     );
   }
   return <>{lines}</>;
@@ -98,34 +95,30 @@ function TextEditorBlock({
   const preview = applyTemplate(node.text, sampleRow);
   const shadowBlur = sel ? 8 + Math.sin(tick * 0.35) * 6 : 0;
 
-  const dragEndGroup =
-    (id: string) => (e: KonvaEventObject<DragEvent>) => {
-      const g = e.target as Konva.Group;
-      onChange(
-        updateNodeInState(state, id, (n) => ({ ...n, x: g.x(), y: g.y() } as LayoutElement)),
-      );
-    };
-  const transformEndGroup =
-    (id: string) => (e: KonvaEventObject<Event>) => {
-      const g = e.target as Konva.Group;
-      const sx = g.scaleX();
-      const sy = g.scaleY();
-      const rotation = g.rotation();
-      const x = g.x();
-      const y = g.y();
-      g.scaleX(1);
-      g.scaleY(1);
-      const found = findNode(state.root, id);
-      if (!found || found.node.type !== 'text') return;
-      onChange(
-        updateNodeInState(state, id, (el) => {
-          if (el.type !== 'text') return el;
-          const w = Math.round(Math.max(24, (el.width ?? 100) * sx) * 100) / 100;
-          const fs = Math.round(Math.max(8, (el.fontSize ?? 16) * sy) * 100) / 100;
-          return { ...el, x, y, width: w, fontSize: fs, rotation };
-        }),
-      );
-    };
+  const dragEndGroup = (id: string) => (e: KonvaEventObject<DragEvent>) => {
+    const g = e.target as Konva.Group;
+    onChange(updateNodeInState(state, id, (n) => ({ ...n, x: g.x(), y: g.y() }) as LayoutElement));
+  };
+  const transformEndGroup = (id: string) => (e: KonvaEventObject<Event>) => {
+    const g = e.target as Konva.Group;
+    const sx = g.scaleX();
+    const sy = g.scaleY();
+    const rotation = g.rotation();
+    const x = g.x();
+    const y = g.y();
+    g.scaleX(1);
+    g.scaleY(1);
+    const found = findNode(state.root, id);
+    if (!found || found.node.type !== 'text') return;
+    onChange(
+      updateNodeInState(state, id, (el) => {
+        if (el.type !== 'text') return el;
+        const w = Math.round(Math.max(24, (el.width ?? 100) * sx) * 100) / 100;
+        const fs = Math.round(Math.max(8, (el.fontSize ?? 16) * sy) * 100) / 100;
+        return { ...el, x, y, width: w, fontSize: fs, rotation };
+      })
+    );
+  };
 
   return (
     <KonvaGroup
@@ -234,50 +227,48 @@ function EditorNode({
   if (!isVisible(node)) return null;
 
   const sel = node.id === selectedId;
-  const dragEnd =
-    (id: string) => (e: KonvaEventObject<DragEvent>) => {
-      const x = e.target.x();
-      const y = e.target.y();
-      onChange(updateNodeInState(state, id, (n) => ({ ...n, x, y } as LayoutElement)));
-    };
-  const transformEnd =
-    (id: string) => (e: KonvaEventObject<Event>) => {
-      const t = e.target;
-      const sx = t.scaleX();
-      const sy = t.scaleY();
-      const rotation = t.rotation();
-      const x = t.x();
-      const y = t.y();
-      t.scaleX(1);
-      t.scaleY(1);
-      const found = findNode(state.root, id);
-      if (!found) return;
-      const n = found.node;
-      if (n.type === 'rect' || n.type === 'image') {
-        onChange(
-          updateNodeInState(state, id, (node) => {
-            if (node.type !== 'rect' && node.type !== 'image') return node;
-            return {
-              ...node,
-              x,
-              y,
-              width: Math.round(Math.max(4, node.width * sx) * 100) / 100,
-              height: Math.round(Math.max(4, node.height * sy) * 100) / 100,
-              rotation,
-            };
-          }),
-        );
-      } else if (n.type === 'text') {
-        onChange(
-          updateNodeInState(state, id, (node) => {
-            if (node.type !== 'text') return node;
-            const w = Math.round(Math.max(24, (node.width ?? 100) * sx) * 100) / 100;
-            const fs = Math.round(Math.max(8, (node.fontSize ?? 16) * sy) * 100) / 100;
-            return { ...node, x, y, width: w, fontSize: fs, rotation };
-          }),
-        );
-      }
-    };
+  const dragEnd = (id: string) => (e: KonvaEventObject<DragEvent>) => {
+    const x = e.target.x();
+    const y = e.target.y();
+    onChange(updateNodeInState(state, id, (n) => ({ ...n, x, y }) as LayoutElement));
+  };
+  const transformEnd = (id: string) => (e: KonvaEventObject<Event>) => {
+    const t = e.target;
+    const sx = t.scaleX();
+    const sy = t.scaleY();
+    const rotation = t.rotation();
+    const x = t.x();
+    const y = t.y();
+    t.scaleX(1);
+    t.scaleY(1);
+    const found = findNode(state.root, id);
+    if (!found) return;
+    const n = found.node;
+    if (n.type === 'rect' || n.type === 'image') {
+      onChange(
+        updateNodeInState(state, id, (node) => {
+          if (node.type !== 'rect' && node.type !== 'image') return node;
+          return {
+            ...node,
+            x,
+            y,
+            width: Math.round(Math.max(4, node.width * sx) * 100) / 100,
+            height: Math.round(Math.max(4, node.height * sy) * 100) / 100,
+            rotation,
+          };
+        })
+      );
+    } else if (n.type === 'text') {
+      onChange(
+        updateNodeInState(state, id, (node) => {
+          if (node.type !== 'text') return node;
+          const w = Math.round(Math.max(24, (node.width ?? 100) * sx) * 100) / 100;
+          const fs = Math.round(Math.max(8, (node.fontSize ?? 16) * sy) * 100) / 100;
+          return { ...node, x, y, width: w, fontSize: fs, rotation };
+        })
+      );
+    }
+  };
 
   if (node.type === 'rect') {
     return (
@@ -408,7 +399,7 @@ type LayoutEditorProps = {
 
 export const LayoutEditor = forwardRef<LayoutEditorHandle, LayoutEditorProps>(function LayoutEditor(
   { state, onChange, assetUrls, sampleRow, deckRows = [], dataSources = [], onCapabilitiesChange },
-  ref,
+  ref
 ) {
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [selectedDataSourceId, setSelectedDataSourceId] = useState<string | null>(null);
@@ -435,7 +426,7 @@ export const LayoutEditor = forwardRef<LayoutEditorHandle, LayoutEditorProps>(fu
       setCanRedo(false);
       onChange(next);
     },
-    [state, onChange],
+    [state, onChange]
   );
 
   const undo = useCallback(() => {
@@ -492,7 +483,7 @@ export const LayoutEditor = forwardRef<LayoutEditorHandle, LayoutEditorProps>(fu
       zoomOut: zoomOutFromMenu,
       zoomTo100Percent,
     }),
-    [undo, redo, state, commit, zoomToFit, zoomInFromMenu, zoomOutFromMenu, zoomTo100Percent],
+    [undo, redo, state, commit, zoomToFit, zoomInFromMenu, zoomOutFromMenu, zoomTo100Percent]
   );
 
   useEffect(() => {
@@ -573,8 +564,8 @@ export const LayoutEditor = forwardRef<LayoutEditorHandle, LayoutEditorProps>(fu
   }, []);
 
   const selected = useMemo(
-    () => (selectedId ? findNode(state.root, selectedId)?.node ?? null : null),
-    [state.root, selectedId],
+    () => (selectedId ? (findNode(state.root, selectedId)?.node ?? null) : null),
+    [state.root, selectedId]
   );
 
   useEffect(() => {
@@ -593,21 +584,16 @@ export const LayoutEditor = forwardRef<LayoutEditorHandle, LayoutEditorProps>(fu
   const updateSelected = useCallback(
     (patch: Partial<LayoutElement>) => {
       if (!selectedId) return;
-      commit(
-        updateNodeInState(state, selectedId, (n) => ({ ...n, ...patch } as LayoutElement)),
-      );
+      commit(updateNodeInState(state, selectedId, (n) => ({ ...n, ...patch }) as LayoutElement));
     },
-    [selectedId, state, commit],
+    [selectedId, state, commit]
   );
 
   const bg = state.background ?? '#1e1e24';
   const pad = 8;
   const fitScale = useMemo(() => {
     if (viewport.w > 0 && viewport.h > 0) {
-      return Math.min(
-        (viewport.w - pad * 2) / state.width,
-        (viewport.h - pad * 2) / state.height,
-      );
+      return Math.min((viewport.w - pad * 2) / state.width, (viewport.h - pad * 2) / state.height);
     }
     return Math.min(1, 480 / state.width);
   }, [viewport.w, viewport.h, state.width, state.height]);
@@ -622,7 +608,7 @@ export const LayoutEditor = forwardRef<LayoutEditorHandle, LayoutEditorProps>(fu
       updateNodeInState(state, id, (n) => ({
         ...n,
         visible: isVisible(n) ? false : true,
-      })),
+      }))
     );
   };
   const toggleLock = (id: string) => {
@@ -630,7 +616,7 @@ export const LayoutEditor = forwardRef<LayoutEditorHandle, LayoutEditorProps>(fu
       updateNodeInState(state, id, (n) => ({
         ...n,
         locked: isLocked(n) ? false : true,
-      })),
+      }))
     );
   };
 
@@ -707,24 +693,15 @@ export const LayoutEditor = forwardRef<LayoutEditorHandle, LayoutEditorProps>(fu
       showGrid,
       hasSelection: !!selectedId,
     }),
-    [
-      state,
-      selectedId,
-      commit,
-      undo,
-      redo,
-      canUndo,
-      canRedo,
-      showGrid,
-    ],
+    [state, selectedId, commit, undo, redo, canUndo, canRedo, showGrid]
   );
 
   const activeSource = useMemo(
     () => (selectedDataSourceId ? dataSources.find((s) => s.id === selectedDataSourceId) : null),
-    [selectedDataSourceId, dataSources],
+    [selectedDataSourceId, dataSources]
   );
   const effectiveRows = activeSource ? activeSource.rows : deckRows;
-  const effectiveSampleRow = activeSource ? activeSource.rows[0] ?? {} : sampleRow;
+  const effectiveSampleRow = activeSource ? (activeSource.rows[0] ?? {}) : sampleRow;
   const filmstripRows = effectiveRows.length > 0 ? effectiveRows : [{}];
   const [deckPreviewOpen, setDeckPreviewOpen] = useState(false);
   const deckDrawerId = useId();
@@ -763,7 +740,7 @@ export const LayoutEditor = forwardRef<LayoutEditorHandle, LayoutEditorProps>(fu
       if (Number.isFinite(n)) setZoomPercent(clampZoomPercent(n));
     }
     setZoomInputEditing(false);
-  }, [zoomInputDraft]);
+  }, [zoomInputDraft, setZoomInputEditing, setZoomPercent]);
 
   const onZoomInputKeyDown = useCallback(
     (e: KeyboardEvent<HTMLInputElement>) => {
@@ -779,7 +756,7 @@ export const LayoutEditor = forwardRef<LayoutEditorHandle, LayoutEditorProps>(fu
         e.currentTarget.blur();
       }
     },
-    [zoomPercent],
+    [zoomPercent, setZoomInputDraft, setZoomInputEditing]
   );
 
   return (
@@ -791,7 +768,8 @@ export const LayoutEditor = forwardRef<LayoutEditorHandle, LayoutEditorProps>(fu
       <div className="layout-editor-shell">
         <aside className="layout-editor-props layout-editor-props-left">
           <p className="props-panel-title">
-            Properties: <span className="props-panel-title-strong">{propsInspectorTitle(selected)}</span>
+            Properties:{' '}
+            <span className="props-panel-title-strong">{propsInspectorTitle(selected)}</span>
           </p>
           {!selected && (
             <p className="muted props-panel-intro">
@@ -867,9 +845,7 @@ export const LayoutEditor = forwardRef<LayoutEditorHandle, LayoutEditorProps>(fu
                     <input
                       type="text"
                       value={selected.artKey}
-                      onChange={(e) =>
-                        updateSelected({ artKey: e.target.value.trim() || 'art' })
-                      }
+                      onChange={(e) => updateSelected({ artKey: e.target.value.trim() || 'art' })}
                     />
                   </label>
                 </div>
@@ -883,9 +859,7 @@ export const LayoutEditor = forwardRef<LayoutEditorHandle, LayoutEditorProps>(fu
                       type="number"
                       min={8}
                       value={Math.round(selected.width)}
-                      onChange={(e) =>
-                        updateSelected({ width: Number(e.target.value) || 8 })
-                      }
+                      onChange={(e) => updateSelected({ width: Number(e.target.value) || 8 })}
                     />
                   </label>
                   <label>
@@ -894,9 +868,7 @@ export const LayoutEditor = forwardRef<LayoutEditorHandle, LayoutEditorProps>(fu
                       type="number"
                       min={8}
                       value={Math.round(selected.height)}
-                      onChange={(e) =>
-                        updateSelected({ height: Number(e.target.value) || 8 })
-                      }
+                      onChange={(e) => updateSelected({ height: Number(e.target.value) || 8 })}
                     />
                   </label>
                 </div>
@@ -927,9 +899,7 @@ export const LayoutEditor = forwardRef<LayoutEditorHandle, LayoutEditorProps>(fu
                       type="number"
                       min={1}
                       value={Math.round(selected.width)}
-                      onChange={(e) =>
-                        updateSelected({ width: Number(e.target.value) || 1 })
-                      }
+                      onChange={(e) => updateSelected({ width: Number(e.target.value) || 1 })}
                     />
                   </label>
                   <label>
@@ -938,9 +908,7 @@ export const LayoutEditor = forwardRef<LayoutEditorHandle, LayoutEditorProps>(fu
                       type="number"
                       min={1}
                       value={Math.round(selected.height)}
-                      onChange={(e) =>
-                        updateSelected({ height: Number(e.target.value) || 1 })
-                      }
+                      onChange={(e) => updateSelected({ height: Number(e.target.value) || 1 })}
                     />
                   </label>
                 </div>
@@ -958,73 +926,73 @@ export const LayoutEditor = forwardRef<LayoutEditorHandle, LayoutEditorProps>(fu
                   transform: `translate(${pan.x}px, ${pan.y}px)`,
                 }}
               >
-              <div
-                className="layout-editor-stage-wrap"
-                style={{
-                  width: stageW,
-                  height: stageH,
-                  position: 'relative',
-                }}
-              >
-                {/*
+                <div
+                  className="layout-editor-stage-wrap"
+                  style={{
+                    width: stageW,
+                    height: stageH,
+                    position: 'relative',
+                  }}
+                >
+                  {/*
                   Scale via CSS, not a scaled Konva Group — nested drags use wrong deltas
                   when an ancestor has scaleX/scaleY.
                 */}
-                <div
-                  style={{
-                    position: 'absolute',
-                    left: 0,
-                    top: 0,
-                    width: state.width,
-                    height: state.height,
-                    transform: `scale(${scale})`,
-                    transformOrigin: 'top left',
-                  }}
-                >
-                  <Stage
-                    width={state.width}
-                    height={state.height}
-                    style={{ background: bg, display: 'block' }}
-                    onMouseDown={(e) => {
-                      const st = e.target.getStage();
-                      if (e.target === st) setSelectedId(null);
+                  <div
+                    style={{
+                      position: 'absolute',
+                      left: 0,
+                      top: 0,
+                      width: state.width,
+                      height: state.height,
+                      transform: `scale(${scale})`,
+                      transformOrigin: 'top left',
                     }}
                   >
-                    <Layer>
-                      <Rect
-                        width={state.width}
-                        height={state.height}
-                        fill={bg}
-                        onMouseDown={() => setSelectedId(null)}
-                      />
-                      {showGrid && <GridOverlay w={state.width} h={state.height} step={10} />}
-                      {state.root.map((node) => (
-                        <EditorNode
-                          key={node.id}
-                          node={node}
-                          selectedId={selectedId}
-                          assetUrls={assetUrls}
-                          sampleRow={effectiveSampleRow}
-                          setNodeRef={setNodeRef}
-                          onSelect={setSelectedId}
-                          onChange={commit}
-                          state={state}
+                    <Stage
+                      width={state.width}
+                      height={state.height}
+                      style={{ background: bg, display: 'block' }}
+                      onMouseDown={(e) => {
+                        const st = e.target.getStage();
+                        if (e.target === st) setSelectedId(null);
+                      }}
+                    >
+                      <Layer>
+                        <Rect
+                          width={state.width}
+                          height={state.height}
+                          fill={bg}
+                          onMouseDown={() => setSelectedId(null)}
                         />
-                      ))}
-                      <Transformer
-                        ref={trRef}
-                        rotateEnabled
-                        borderStroke="#10b981"
-                        borderDash={[4, 4]}
-                        anchorStroke="#ecfdf5"
-                        anchorFill="#059669"
-                        anchorSize={8}
-                        boundBoxFunc={(_oldBox, newBox) => newBox}
-                      />
-                    </Layer>
-                  </Stage>
+                        {showGrid && <GridOverlay w={state.width} h={state.height} step={10} />}
+                        {state.root.map((node) => (
+                          <EditorNode
+                            key={node.id}
+                            node={node}
+                            selectedId={selectedId}
+                            assetUrls={assetUrls}
+                            sampleRow={effectiveSampleRow}
+                            setNodeRef={setNodeRef}
+                            onSelect={setSelectedId}
+                            onChange={commit}
+                            state={state}
+                          />
+                        ))}
+                        <Transformer
+                          ref={trRef}
+                          rotateEnabled
+                          borderStroke="#10b981"
+                          borderDash={[4, 4]}
+                          anchorStroke="#ecfdf5"
+                          anchorFill="#059669"
+                          anchorSize={8}
+                          boundBoxFunc={(_oldBox, newBox) => newBox}
+                        />
+                      </Layer>
+                    </Stage>
+                  </div>
                 </div>
-              </div>
               </div>
             </div>
           </div>
@@ -1130,12 +1098,7 @@ export const LayoutEditor = forwardRef<LayoutEditorHandle, LayoutEditorProps>(fu
               return (
                 <div key={i} className="deck-filmstrip-item" title={String(label)}>
                   <div className="deck-filmstrip-thumb">
-                    <CardFace
-                      state={state}
-                      row={row}
-                      assetUrls={assetUrls}
-                      pixelWidth={72}
-                    />
+                    <CardFace state={state} row={row} assetUrls={assetUrls} pixelWidth={72} />
                   </div>
                 </div>
               );
@@ -1162,9 +1125,7 @@ export const LayoutEditor = forwardRef<LayoutEditorHandle, LayoutEditorProps>(fu
               min={100}
               max={2000}
               value={state.width}
-              onChange={(e) =>
-                commit({ ...state, width: Number(e.target.value) || state.width })
-              }
+              onChange={(e) => commit({ ...state, width: Number(e.target.value) || state.width })}
               aria-label="Card width in pixels"
             />
           </LayoutEditorFooterValueStrip>
@@ -1178,9 +1139,7 @@ export const LayoutEditor = forwardRef<LayoutEditorHandle, LayoutEditorProps>(fu
               min={100}
               max={3000}
               value={state.height}
-              onChange={(e) =>
-                commit({ ...state, height: Number(e.target.value) || state.height })
-              }
+              onChange={(e) => commit({ ...state, height: Number(e.target.value) || state.height })}
               aria-label="Card height in pixels"
             />
           </LayoutEditorFooterValueStrip>

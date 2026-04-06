@@ -301,7 +301,7 @@ export function ZoneHierarchy({
       if (dragId === targetId) return;
       onMoveNode(dragId, targetId, place);
     },
-    [onMoveNode],
+    [onMoveNode]
   );
 
   const handleDragEnd = useCallback(() => {
@@ -313,7 +313,8 @@ export function ZoneHierarchy({
       <ZoneToolbar {...toolbar} />
       <h3 className="zone-hierarchy-heading">Layers</h3>
       <p className="muted zone-hierarchy-hint">
-        Drag <strong>⋮⋮</strong> to reorder. Drop on the top or bottom half of a row to place above or below.
+        Drag <strong>⋮⋮</strong> to reorder. Drop on the top or bottom half of a row to place above
+        or below.
       </p>
       <div className="zone-tree">
         {root.length === 0 && <p className="muted">No zones yet.</p>}
