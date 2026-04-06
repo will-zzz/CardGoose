@@ -43,6 +43,8 @@ model CardGroup {
   layoutId       String?  @map("layout_id") @db.Uuid
   sortOrder      Int      @default(0) @map("sort_order")
   csvSourceUrl   String?  @map("csv_source_url")
+  /// Display label (e.g. Google Sheet tab name) parsed from export filename when available
+  dataSourceLabel String? @map("data_source_label")
   csvData        Json?    @map("csv_data")
   createdAt      DateTime @default(now()) @map("created_at")
   updatedAt      DateTime @updatedAt @map("updated_at")

@@ -307,9 +307,37 @@ projectsRouter.post('/:id/csv/refresh', async (req, res) => {
   res.json({ csvData: parsed, csvSourceUrl: href });
 });
 
+/** RFC 5987 / quoted filename from Content-Disposition */
+function parseFilenameFromContentDisposition(cd: string | null): string | null {
+  if (!cd || typeof cd !== 'string') return null;
+  const star = /filename\*=UTF-8''([^;\n]+)/i.exec(cd);
+  if (star) {
+    try {
+      return decodeURIComponent(star[1].trim());
+    } catch {
+      return star[1].trim();
+    }
+  }
+  const q = /filename="([^"]+)"/i.exec(cd);
+  if (q) return q[1].trim();
+  const u = /filename=([^;\s]+)/i.exec(cd);
+  if (u) return u[1].replace(/^["']|["']$/g, '').trim();
+  return null;
+}
+
+/** e.g. "My Deck - Monsters.csv" → "Monsters" */
+function tabLabelFromExportFilename(filename: string): string | null {
+  const base = filename.replace(/\.csv$/i, '').trim();
+  const sep = ' - ';
+  const idx = base.lastIndexOf(sep);
+  if (idx === -1) return null;
+  const tab = base.slice(idx + sep.length).trim();
+  return tab.length > 0 ? tab : null;
+}
+
 async function downloadAndParseCsv(href: string): Promise<{
-  headers: string[];
-  rows: Record<string, string>[];
+  parsed: { headers: string[]; rows: Record<string, string>[] };
+  sourceLabel: string | null;
 }> {
   const r = await fetch(href, {
     redirect: 'follow',
@@ -318,13 +346,16 @@ async function downloadAndParseCsv(href: string): Promise<{
   if (!r.ok) {
     throw new Error(`Fetch failed: ${r.status} ${r.statusText}`);
   }
+  const cd = r.headers.get('content-disposition');
+  const filename = parseFilenameFromContentDisposition(cd);
+  const sourceLabel = filename ? tabLabelFromExportFilename(filename) : null;
   const text = await r.text();
   const parsedRaw = parseCsvText(text);
   const parsed = parseCsvPayload(parsedRaw);
   if (!parsed) {
     throw new Error('CSV did not contain a valid header row');
   }
-  return parsed;
+  return { parsed, sourceLabel };
 }
 
 /** List card groups for a project */
@@ -345,6 +376,7 @@ projectsRouter.get('/:id/card-groups', async (req, res) => {
       layoutId: true,
       sortOrder: true,
       csvSourceUrl: true,
+      dataSourceLabel: true,
       csvData: true,
       createdAt: true,
       updatedAt: true,
@@ -381,6 +413,7 @@ projectsRouter.post('/:id/card-groups', async (req, res) => {
       layoutId: true,
       sortOrder: true,
       csvSourceUrl: true,
+      dataSourceLabel: true,
       csvData: true,
       createdAt: true,
       updatedAt: true,
@@ -429,6 +462,7 @@ projectsRouter.put('/:id/card-groups/reorder', async (req, res) => {
       layoutId: true,
       sortOrder: true,
       csvSourceUrl: true,
+      dataSourceLabel: true,
       csvData: true,
       createdAt: true,
       updatedAt: true,
@@ -489,6 +523,7 @@ projectsRouter.put('/:id/card-groups/:groupId', async (req, res) => {
     if (body.csvSourceUrl === null || body.csvSourceUrl === '') {
       patch.csvSourceUrl = null;
       patch.csvData = Prisma.JsonNull;
+      patch.dataSourceLabel = null;
     } else if (typeof body.csvSourceUrl === 'string') {
       try {
         patch.csvSourceUrl = assertHttpsCsvUrl(body.csvSourceUrl);
@@ -505,8 +540,9 @@ projectsRouter.put('/:id/card-groups/:groupId', async (req, res) => {
 
   if (csvUrlToFetch !== undefined && csvUrlToFetch !== null) {
     try {
-      const parsed = await downloadAndParseCsv(csvUrlToFetch);
+      const { parsed, sourceLabel } = await downloadAndParseCsv(csvUrlToFetch);
       patch.csvData = parsed as Prisma.InputJsonValue;
+      patch.dataSourceLabel = sourceLabel;
     } catch (e) {
       req.log?.warn({ err: e, href: csvUrlToFetch }, 'cardGroup.csv fetch failed');
       res.status(502).json({
@@ -525,6 +561,7 @@ projectsRouter.put('/:id/card-groups/:groupId', async (req, res) => {
       layoutId: true,
       sortOrder: true,
       csvSourceUrl: true,
+      dataSourceLabel: true,
       csvData: true,
       createdAt: true,
       updatedAt: true,
@@ -567,16 +604,21 @@ projectsRouter.post('/:id/card-groups/:groupId/csv/refresh', async (req, res) =>
     return;
   }
   try {
-    const parsed = await downloadAndParseCsv(href);
+    const { parsed, sourceLabel } = await downloadAndParseCsv(href);
     const updated = await prisma.cardGroup.update({
       where: { id: groupId },
-      data: { csvData: parsed, csvSourceUrl: href },
+      data: {
+        csvData: parsed as Prisma.InputJsonValue,
+        csvSourceUrl: href,
+        dataSourceLabel: sourceLabel,
+      },
       select: {
         id: true,
         name: true,
         layoutId: true,
         sortOrder: true,
         csvSourceUrl: true,
+        dataSourceLabel: true,
         csvData: true,
         createdAt: true,
         updatedAt: true,
@@ -622,6 +664,7 @@ projectsRouter.post('/:id/card-groups/:groupId/duplicate', async (req, res) => {
       sortOrder,
       layoutId: source.layoutId,
       csvSourceUrl: source.csvSourceUrl,
+      dataSourceLabel: source.dataSourceLabel,
       csvData:
         source.csvData === null
           ? Prisma.JsonNull
@@ -633,6 +676,7 @@ projectsRouter.post('/:id/card-groups/:groupId/duplicate', async (req, res) => {
       layoutId: true,
       sortOrder: true,
       csvSourceUrl: true,
+      dataSourceLabel: true,
       csvData: true,
       createdAt: true,
       updatedAt: true,

@@ -1376,6 +1376,10 @@ button.zone-row-body:hover {
   margin-left: auto;
 }
 
+.card-group-header-actions .card-group-synced {
+  margin-right: 6px;
+}
+
 .card-group-icon-btn {
   display: inline-flex;
   align-items: center;

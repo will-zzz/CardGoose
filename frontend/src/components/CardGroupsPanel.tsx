@@ -30,6 +30,8 @@ export type CardGroupDto = {
   layoutId: string | null;
   sortOrder: number;
   csvSourceUrl: string | null;
+  /** Tab name etc., from export filename when server could parse Content-Disposition */
+  dataSourceLabel?: string | null;
   csvData: CsvData | null;
   updatedAt?: string;
 };
@@ -66,14 +68,14 @@ function formatSyncedShort(iso: string): string {
   return `${d}d ago`;
 }
 
-function sheetConnectionLabel(csvSourceUrl: string | null, hasCsv: boolean): string {
-  if (!csvSourceUrl) return 'Not connected';
+function sheetConnectionLabel(g: CardGroupDto, hasCsv: boolean): string {
+  if (!g.csvSourceUrl) return 'Not connected';
   if (!hasCsv) return 'Pending sync…';
+  const label = g.dataSourceLabel?.trim();
+  if (label) return label;
   try {
-    const u = new URL(csvSourceUrl);
+    const u = new URL(g.csvSourceUrl);
     const host = u.hostname.replace(/^www\./, '');
-    const gid = u.searchParams.get('gid');
-    if (host.includes('google') && gid != null) return `Tab ${gid}`;
     if (host.length > 28) return `${host.slice(0, 25)}…`;
     return host;
   } catch {
@@ -116,6 +118,7 @@ export function CardGroupsPanel(props: {
   const [urlEditorGroupId, setUrlEditorGroupId] = useState<string | null>(null);
   const [urlDraft, setUrlDraft] = useState('');
   const dragId = useRef<string | null>(null);
+  const dragGhostRef = useRef<HTMLDivElement | null>(null);
   const titleInputRef = useRef<HTMLInputElement>(null);
 
   const loadGroups = useCallback(async () => {
@@ -283,10 +286,6 @@ export function CardGroupsPanel(props: {
     [urlDraft, updateGroup],
   );
 
-  const onDragStart = (id: string) => {
-    dragId.current = id;
-  };
-
   const onDragOver = (e: React.DragEvent) => {
     e.preventDefault();
     e.dataTransfer.dropEffect = 'move';
@@ -304,6 +303,43 @@ export function CardGroupsPanel(props: {
     if (ti2 < 0) return;
     next.splice(ti2, 0, moved);
     void reorderGroups(next);
+  };
+
+  const onGroupDragStart = (e: React.DragEvent<HTMLElement>, g: CardGroupDto) => {
+    if (!(e.target as HTMLElement).closest('.card-group-drag')) {
+      e.preventDefault();
+      return;
+    }
+    e.dataTransfer.effectAllowed = 'move';
+    e.dataTransfer.setData('text/plain', g.id);
+    dragId.current = g.id;
+    const shell = e.currentTarget;
+    const rect = shell.getBoundingClientRect();
+    const ghost = shell.cloneNode(true) as HTMLElement;
+    ghost.style.width = `${rect.width}px`;
+    ghost.style.opacity = '0.95';
+    ghost.style.position = 'fixed';
+    ghost.style.left = '-9999px';
+    ghost.style.top = '0';
+    ghost.style.zIndex = '100000';
+    ghost.style.pointerEvents = 'none';
+    ghost.style.boxShadow = '0 16px 48px rgba(0, 0, 0, 0.5)';
+    ghost.style.borderRadius = getComputedStyle(shell).borderRadius;
+    document.body.appendChild(ghost);
+    dragGhostRef.current = ghost;
+    const ox = Math.min(56, Math.max(24, rect.width * 0.12));
+    const oy = 22;
+    try {
+      e.dataTransfer.setDragImage(ghost, ox, oy);
+    } catch {
+      /* some browsers */
+    }
+  };
+
+  const onGroupDragEnd = () => {
+    dragGhostRef.current?.remove();
+    dragGhostRef.current = null;
+    dragId.current = null;
   };
 
   const layoutStateById = useMemo(() => {
@@ -386,28 +422,22 @@ export function CardGroupsPanel(props: {
           const ready = isGroupReady(g);
           const hasCsv = hasCsvReady(g);
           const layoutNm = layoutName(layoutsFull, g.layoutId);
-          const dataLabel = sheetConnectionLabel(g.csvSourceUrl, hasCsv);
+          const dataLabel = sheetConnectionLabel(g, hasCsv);
 
           return (
             <article
               key={g.id}
               className="card-group-shell"
+              draggable
+              onDragStart={(e) => onGroupDragStart(e, g)}
+              onDragEnd={onGroupDragEnd}
               onDragOver={onDragOver}
               onDrop={() => onDrop(g.id)}
             >
               <header
                 className={`card-group-header${ready ? ' card-group-header--ready' : ''}`}
               >
-                <button
-                  type="button"
-                  className="card-group-drag"
-                  draggable
-                  onDragStart={() => onDragStart(g.id)}
-                  onDragEnd={() => {
-                    dragId.current = null;
-                  }}
-                  aria-label="Reorder group"
-                >
+                <button type="button" className="card-group-drag" aria-label="Reorder group">
                   <GripVertical size={16} strokeWidth={2} aria-hidden />
                 </button>
 
@@ -459,7 +489,6 @@ export function CardGroupsPanel(props: {
                     <DropdownMenuTrigger
                       className={`card-group-meta-chip${!g.layoutId ? ' card-group-meta-chip--muted' : ''}`}
                       disabled={busy || layoutsFull.length === 0}
-                      onPointerDown={(e) => e.preventDefault()}
                     >
                       <LayoutTemplate size={14} strokeWidth={2} aria-hidden />
                       <span className="card-group-meta-chip-text">{layoutNm}</span>
@@ -485,13 +514,12 @@ export function CardGroupsPanel(props: {
                     <span>{dataLabel}</span>
                   </span>
 
-                  {ready && g.updatedAt ? (
-                    <span className="card-group-synced" title={g.updatedAt}>
-                      Synced {formatSyncedShort(g.updatedAt)}
-                    </span>
-                  ) : null}
-
                   <div className="card-group-header-actions">
+                    {ready && g.updatedAt ? (
+                      <span className="card-group-synced" title={g.updatedAt}>
+                        Synced {formatSyncedShort(g.updatedAt)}
+                      </span>
+                    ) : null}
                     <button
                       type="button"
                       className="card-group-icon-btn"
@@ -507,7 +535,6 @@ export function CardGroupsPanel(props: {
                         className="card-group-icon-btn card-group-icon-btn--menu"
                         disabled={busy}
                         aria-label="Group actions"
-                        onPointerDown={(e) => e.preventDefault()}
                       >
                         <MoreVertical size={16} strokeWidth={2} />
                       </DropdownMenuTrigger>
@@ -622,7 +649,6 @@ export function CardGroupsPanel(props: {
                                   <DropdownMenuTrigger
                                     className="cards-thumb-menu-btn"
                                     aria-label="Quick actions"
-                                    onPointerDown={(e) => e.preventDefault()}
                                   >
                                     <MoreVertical size={15} strokeWidth={2} />
                                   </DropdownMenuTrigger>
