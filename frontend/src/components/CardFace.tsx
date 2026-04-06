@@ -1,5 +1,5 @@
 import type { Ref } from 'react';
-import type { Layer as KonvaLayer } from 'konva';
+import type { Layer as KonvaLayer } from 'konva/lib/Layer';
 import { Group as KonvaGroup, Image as KonvaImage, Layer, Rect, Stage, Text } from 'react-konva';
 import type { LayoutElement, LayoutStateV2 } from '../types/layout';
 import { applyTemplate } from '../lib/template';

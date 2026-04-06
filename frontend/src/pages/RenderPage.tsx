@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
-import type { Layer as KonvaLayer } from 'konva';
+import type { Layer as KonvaLayer } from 'konva/lib/Layer';
 import { CardFace } from '../components/CardFace';
 import { ensureLayoutState, type LayoutStateV2 } from '../types/layout';
 
