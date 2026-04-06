@@ -123,7 +123,14 @@ def render_card_pngs(payload: dict[str, Any]) -> list[bytes]:
 
     with sync_playwright() as p:
         t_launch = time.perf_counter()
-        browser = p.chromium.launch(headless=True)
+        browser = p.chromium.launch(
+            headless=True,
+            args=[
+                "--disable-dev-shm-usage",
+                "--no-first-run",
+                "--no-default-browser-check",
+            ],
+        )
         logger.info("browser_launch elapsed_ms=%.1f", _elapsed_ms(t_launch))
         page = browser.new_page(device_scale_factor=1)
         _attach_diag_listeners(page)
@@ -207,14 +214,6 @@ def render_card_pngs(payload: dict[str, Any]) -> list[bytes]:
                             if err:
                                 raise RuntimeError(str(err))
 
-                            t_after = time.perf_counter()
-                            page.wait_for_timeout(80)
-                            logger.info(
-                                "card_phase card_index=%s step=post_wait_ms=80 elapsed_ms=%.1f",
-                                card_index,
-                                _elapsed_ms(t_after),
-                            )
-
                             t_shot = time.perf_counter()
                             canvas = page.locator("canvas").first
                             png = canvas.screenshot(type="png")
@@ -264,9 +263,13 @@ def render_card_pngs(payload: dict[str, Any]) -> list[bytes]:
         finally:
             browser.close()
 
+    n = len(pngs)
+    total_ms = _elapsed_ms(t_job)
     logger.info(
-        "pdf_render_done cards_rendered=%s total_elapsed_ms=%.1f",
-        len(pngs),
-        _elapsed_ms(t_job),
+        "pdf_render_done cards_rendered=%s total_elapsed_ms=%.1f avg_ms_per_card=%.1f "
+        "(sequential Playwright screenshots; total ~= N × per-card cost; use lower dpi or EXPORT_PDF_DPI)",
+        n,
+        total_ms,
+        total_ms / n if n else 0.0,
     )
     return pngs

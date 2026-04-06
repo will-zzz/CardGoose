@@ -65,6 +65,8 @@ export function ProjectPage() {
   /** Pipeline tab: PDF export bypasses SQS and can take a while */
   const [exportPdfLoading, setExportPdfLoading] = useState(false);
   const [exportPdfStatus, setExportPdfStatus] = useState<string | null>(null);
+  /** Raster DPI for PDF cards (API clamps 150–300) */
+  const [exportPdfDpi, setExportPdfDpi] = useState(150);
   /** Last known persisted snapshot for dirty detection */
   const [savedBaseline, setSavedBaseline] = useState<{
     name: string;
@@ -560,7 +562,7 @@ export function ProjectPage() {
     try {
       const res = await apiJson<{ ok?: boolean; s3Key?: string }>(
         `/api/projects/${id}/export-pdf-direct`,
-        { method: 'POST', token },
+        { method: 'POST', token, body: JSON.stringify({ dpi: exportPdfDpi }) },
       );
       const shortKey = res.s3Key?.split('/').pop() ?? res.s3Key ?? 'export';
       setExportPdfStatus(`PDF ready: ${shortKey}`);
@@ -571,7 +573,7 @@ export function ProjectPage() {
     } finally {
       setExportPdfLoading(false);
     }
-  }, [token, id, loadPipeline]);
+  }, [token, id, loadPipeline, exportPdfDpi]);
 
   useEffect(() => {
     if (!id || tab !== 'layout') {
@@ -803,6 +805,23 @@ export function ProjectPage() {
               Runs the Python worker on this machine via the API (skips SQS). Ensure dependencies are
               installed and <code>RENDER_URL</code> points at this app&apos;s dev server.
             </p>
+            <label className="stack" style={{ maxWidth: 360, marginBottom: 12 }}>
+              <span>
+                Export DPI: <strong>{exportPdfDpi}</strong> (higher = sharper, slower)
+              </span>
+              <input
+                type="range"
+                min={150}
+                max={300}
+                step={1}
+                value={exportPdfDpi}
+                onChange={(e) => setExportPdfDpi(Number(e.target.value))}
+                disabled={busy || exportPdfLoading}
+                aria-valuemin={150}
+                aria-valuemax={300}
+                aria-valuenow={exportPdfDpi}
+              />
+            </label>
             <div className="inline-form" style={{ alignItems: 'center', gap: 10 }}>
               <button
                 type="button"

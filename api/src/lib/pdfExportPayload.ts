@@ -2,6 +2,30 @@ import { prisma } from './prisma.js';
 import { collectArtKeysFromLayoutState } from './layoutArtKeys.js';
 import { getAssetsBucket, getSignedGetUrl } from './s3.js';
 
+/** UI / server default; slider range is 150–300. */
+export const EXPORT_PDF_DPI_MIN = 150;
+export const EXPORT_PDF_DPI_MAX = 300;
+const DEFAULT_EXPORT_PDF_DPI = 150;
+
+function dpiFromEnv(): number {
+  const raw = process.env.EXPORT_PDF_DPI;
+  if (raw === undefined || raw === '') return DEFAULT_EXPORT_PDF_DPI;
+  const n = Number.parseInt(raw, 10);
+  if (!Number.isFinite(n)) return DEFAULT_EXPORT_PDF_DPI;
+  return Math.min(EXPORT_PDF_DPI_MAX, Math.max(EXPORT_PDF_DPI_MIN, n));
+}
+
+/** Client `dpi` from export request, or env default, always clamped to 150–300. */
+export function resolveExportPdfDpi(clientDpi?: unknown): number {
+  if (typeof clientDpi === 'number' && Number.isFinite(clientDpi)) {
+    return Math.min(
+      EXPORT_PDF_DPI_MAX,
+      Math.max(EXPORT_PDF_DPI_MIN, Math.round(clientDpi)),
+    );
+  }
+  return dpiFromEnv();
+}
+
 type CsvData = { headers: string[]; rows: Record<string, string>[] };
 
 function parseCsvData(raw: unknown): CsvData | null {
@@ -17,6 +41,7 @@ function parseCsvData(raw: unknown): CsvData | null {
 export async function buildPdfExportPayload(
   projectId: string,
   userId: string,
+  options?: { dpi?: unknown },
 ): Promise<{ payload: Record<string, unknown>; timestamp: string } | { error: string }> {
   const project = await prisma.project.findFirst({ where: { id: projectId, userId } });
   if (!project) {
@@ -77,7 +102,7 @@ export async function buildPdfExportPayload(
     timestamp,
     paperSize: { width: 8.5, height: 11, unit: 'in' },
     pageMarginIn: 0.25,
-    dpi: 300,
+    dpi: resolveExportPdfDpi(options?.dpi),
     groups: exportGroups,
     assetUrls,
   };

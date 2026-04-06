@@ -10,23 +10,26 @@ export type HeadlessRenderPayload = {
   pixelWidth: number;
 };
 
+/** Reuse decoded images across cards (same asset URLs every row). */
+const urlPreloadOnce = new Map<string, Promise<void>>();
+
+function preloadUrlOnce(url: string): Promise<void> {
+  let p = urlPreloadOnce.get(url);
+  if (!p) {
+    p = new Promise<void>((resolve) => {
+      const img = new Image();
+      img.crossOrigin = 'anonymous';
+      img.onload = () => resolve();
+      img.onerror = () => resolve();
+      img.src = url;
+    });
+    urlPreloadOnce.set(url, p);
+  }
+  return p;
+}
+
 function preloadUrls(urls: string[]): Promise<void> {
-  return Promise.all(
-    urls.map(
-      (url) =>
-        new Promise<void>((resolve) => {
-          if (!url) {
-            resolve();
-            return;
-          }
-          const img = new Image();
-          img.crossOrigin = 'anonymous';
-          img.onload = () => resolve();
-          img.onerror = () => resolve();
-          img.src = url;
-        }),
-    ),
-  ).then(() => undefined);
+  return Promise.all(urls.map((u) => (u ? preloadUrlOnce(u) : Promise.resolve()))).then(() => undefined);
 }
 
 type CardFrame = {
@@ -78,10 +81,9 @@ export function RenderPage() {
     const run = () => {
       if (done) return;
       done = true;
+      // One rAF after Konva afterDraw is enough; double rAF added ~1 frame delay per card.
       requestAnimationFrame(() => {
-        requestAnimationFrame(() => {
-          finishFrame();
-        });
+        finishFrame();
       });
     };
 

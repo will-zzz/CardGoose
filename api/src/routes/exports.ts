@@ -44,8 +44,9 @@ exportsRouter.post('/projects/:projectId/export', async (req, res) => {
 exportsRouter.post('/projects/:projectId/export-pdf', async (req, res) => {
   const userId = req.user!.id;
   const projectId = String(req.params.projectId);
+  const dpi = (req.body as { dpi?: unknown } | undefined)?.dpi;
 
-  const built = await buildPdfExportPayload(projectId, userId);
+  const built = await buildPdfExportPayload(projectId, userId, { dpi });
   if ('error' in built) {
     if (built.error === 'Project not found') {
       res.status(404).json({ error: built.error });
@@ -90,8 +91,9 @@ exportsRouter.post('/projects/:projectId/export-pdf', async (req, res) => {
 exportsRouter.post('/projects/:projectId/export-pdf-direct', async (req, res) => {
   const userId = req.user!.id;
   const projectId = String(req.params.projectId);
+  const dpi = (req.body as { dpi?: unknown } | undefined)?.dpi;
 
-  const built = await buildPdfExportPayload(projectId, userId);
+  const built = await buildPdfExportPayload(projectId, userId, { dpi });
   if ('error' in built) {
     if (built.error === 'Project not found') {
       res.status(404).json({ error: built.error });
