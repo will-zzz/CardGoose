@@ -9,7 +9,6 @@ import {
   useMemo,
   useState,
 } from 'react';
-import { createPortal } from 'react-dom';
 import type { KeyboardEvent, MouseEvent, ReactNode } from 'react';
 import type Konva from 'konva';
 import type { KonvaEventObject } from 'konva/lib/Node';
@@ -728,43 +727,7 @@ export const LayoutEditor = forwardRef<LayoutEditorHandle, LayoutEditorProps>(fu
   const [zoomInputDraft, setZoomInputDraft] = useState('');
   const zoomInputId = useId();
 
-  const [bgPickerOpen, setBgPickerOpen] = useState(false);
-  const [bgPopoverPos, setBgPopoverPos] = useState({ top: 0, left: 0 });
-  const bgSwatchRef = useRef<HTMLButtonElement>(null);
-  const bgPopoverRef = useRef<HTMLDivElement>(null);
-
-  useLayoutEffect(() => {
-    if (!bgPickerOpen || !bgSwatchRef.current) return;
-    const r = bgSwatchRef.current.getBoundingClientRect();
-    const W = 200;
-    const H = 58;
-    let top = r.top - H - 10;
-    if (top < 8) top = r.bottom + 8;
-    let left = r.left + r.width / 2 - W / 2;
-    left = Math.max(8, Math.min(left, window.innerWidth - W - 8));
-    setBgPopoverPos({ top, left });
-  }, [bgPickerOpen]);
-
-  useEffect(() => {
-    if (!bgPickerOpen) return;
-    const down = (ev: Event) => {
-      const t = ev.target as Node;
-      if (bgSwatchRef.current?.contains(t)) return;
-      if (bgPopoverRef.current?.contains(t)) return;
-      setBgPickerOpen(false);
-    };
-    document.addEventListener('mousedown', down);
-    return () => document.removeEventListener('mousedown', down);
-  }, [bgPickerOpen]);
-
-  useEffect(() => {
-    if (!bgPickerOpen) return;
-    const key = (e: globalThis.KeyboardEvent) => {
-      if (e.key === 'Escape') setBgPickerOpen(false);
-    };
-    window.addEventListener('keydown', key, true);
-    return () => window.removeEventListener('keydown', key, true);
-  }, [bgPickerOpen]);
+  const bgColorInputRef = useRef<HTMLInputElement>(null);
 
   const commitZoomInput = useCallback(() => {
     const raw = zoomInputDraft.trim();
@@ -1133,14 +1096,21 @@ export const LayoutEditor = forwardRef<LayoutEditorHandle, LayoutEditorProps>(fu
               aria-label="Card height in pixels"
             />
           </LayoutEditorFooterValueStrip>
+          <input
+            ref={bgColorInputRef}
+            type="color"
+            className="layout-editor-bg-color-input-hidden"
+            value={cssColorToHex(state.background)}
+            onChange={(e) => commit({ ...state, background: e.target.value })}
+            tabIndex={-1}
+            aria-hidden
+          />
           <LayoutEditorFooterButton
-            ref={bgSwatchRef}
             variant="icon"
             className="layout-editor-bg-swatch-btn"
-            onClick={() => setBgPickerOpen((o) => !o)}
+            onClick={() => bgColorInputRef.current?.click()}
             aria-label="Card background color"
-            aria-haspopup="dialog"
-            aria-expanded={bgPickerOpen}
+            title="Choose card background color"
           >
             <span
               className="layout-editor-bg-swatch-chip"
@@ -1202,28 +1172,6 @@ export const LayoutEditor = forwardRef<LayoutEditorHandle, LayoutEditorProps>(fu
           </LayoutEditorFooterButton>
         </div>
       </footer>
-      {bgPickerOpen &&
-        createPortal(
-          <div
-            ref={bgPopoverRef}
-            className="layout-editor-bg-popover"
-            role="dialog"
-            aria-label="Card background color"
-            style={{
-              top: bgPopoverPos.top,
-              left: bgPopoverPos.left,
-              width: 200,
-            }}
-          >
-            <input
-              type="color"
-              className="layout-editor-bg-popover-native"
-              value={cssColorToHex(state.background)}
-              onChange={(e) => commit({ ...state, background: e.target.value })}
-            />
-          </div>,
-          document.body,
-        )}
     </div>
   );
 });
