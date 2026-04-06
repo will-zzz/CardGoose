@@ -10,8 +10,7 @@ import { useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import { apiBase, apiJson } from '../lib/api';
 import { useAuth } from '../contexts/useAuth';
 import { parseCsvText } from '../lib/csv';
-import { CF_LAYOUT_ID_KEY, ensureLayoutIdColumn } from '../lib/cardLayout';
-import { CardsGallery } from '../components/CardsGallery';
+import { CardGroupsPanel } from '../components/CardGroupsPanel';
 import { LayoutEditor, type LayoutEditorHandle } from '../components/LayoutEditor';
 import {
   defaultLayoutState,
@@ -236,32 +235,6 @@ export function ProjectPage() {
       navigateTab('layout');
     },
     [layoutsFull, layoutIsDirty, navigateTab],
-  );
-
-  const addDataRowForLayout = useCallback(
-    async (layoutId: string) => {
-      if (!token || !id || !csvData?.headers.length) return;
-      setBusy(true);
-      setError(null);
-      try {
-        const headers = ensureLayoutIdColumn([...csvData.headers]);
-        const newRow: Record<string, string> = {};
-        for (const h of headers) {
-          newRow[h] = h === CF_LAYOUT_ID_KEY ? layoutId : '';
-        }
-        const res = await apiJson<{ csvData: CsvData }>(`/api/projects/${id}/data`, {
-          method: 'PUT',
-          token,
-          body: JSON.stringify({ headers, rows: [...csvData.rows, newRow] }),
-        });
-        if (project) setProject({ ...project, csvData: res.csvData });
-      } catch (e) {
-        setError(e instanceof Error ? e.message : 'Failed to add row');
-      } finally {
-        setBusy(false);
-      }
-    },
-    [token, id, csvData, project],
   );
 
   useEffect(() => {
@@ -569,20 +542,16 @@ export function ProjectPage() {
 
       {tab === 'cards' && (
         <section className="section cards-tab-section">
-          <CardsGallery
+          <CardGroupsPanel
             projectId={id}
             token={token}
             layoutsFull={layoutsFull}
-            csvData={csvData ?? { headers: [], rows: [] }}
             assetUrls={assetUrls}
+            projectCsvSourceUrl={project?.csvSourceUrl ?? null}
             busy={busy}
             onBusy={setBusy}
             onError={setError}
-            onCsvUpdated={(next) => {
-              if (project) setProject({ ...project, csvData: next });
-            }}
             onOpenLayoutInEditor={openLayoutInEditor}
-            onAddDataRowForLayout={addDataRowForLayout}
           />
         </section>
       )}

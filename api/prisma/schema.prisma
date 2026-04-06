@@ -29,9 +29,29 @@ model Project {
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")
 
-  user    User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  layouts Layout[]
-  assets  Asset[]
+  user        User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+  layouts     Layout[]
+  assets      Asset[]
+  cardGroups  CardGroup[]
+}
+
+/// Manual deck slice: name, template layout, and optional published-CSV source for previews.
+model CardGroup {
+  id             String   @id @default(uuid()) @db.Uuid
+  projectId      String   @map("project_id") @db.Uuid
+  name           String
+  layoutId       String?  @map("layout_id") @db.Uuid
+  sortOrder      Int      @default(0) @map("sort_order")
+  csvSourceUrl   String?  @map("csv_source_url")
+  csvData        Json?    @map("csv_data")
+  createdAt      DateTime @default(now()) @map("created_at")
+  updatedAt      DateTime @updatedAt @map("updated_at")
+
+  project Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  layout  Layout? @relation(fields: [layoutId], references: [id], onDelete: SetNull)
+
+  @@index([projectId])
+  @@index([projectId, sortOrder])
 }
 
 /// react-konva stage JSON + metadata (hybrid schema from design doc).
@@ -42,7 +62,8 @@ model Layout {
   lastUpdated DateTime @default(now()) @map("last_updated")
   state       Json
 
-  project Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  project     Project     @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  cardGroups  CardGroup[]
 
   @@index([projectId])
   @@index([lastUpdated])
