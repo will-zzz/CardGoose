@@ -9,6 +9,7 @@ import {
   useMemo,
   useState,
 } from 'react';
+import { createPortal } from 'react-dom';
 import type { KeyboardEvent, MouseEvent, ReactNode } from 'react';
 import type Konva from 'konva';
 import type { KonvaEventObject } from 'konva/lib/Node';
@@ -28,7 +29,10 @@ import { DEFAULT_NEW_TEXT } from '../types/layout';
 import { applyTemplate } from '../lib/template';
 import { CardFace } from './CardFace';
 import { useImageElement } from './useImageElement';
-import { LayoutEditorFooterButton } from './LayoutEditorFooterButton';
+import {
+  LayoutEditorFooterButton,
+  LayoutEditorFooterValueStrip,
+} from './LayoutEditorFooterButton';
 import { ZoneHierarchy, type ZoneHierarchyToolbarProps } from './ZoneHierarchy';
 import {
   applyInsert,
@@ -336,6 +340,34 @@ const ZOOM_STEP_COARSE = 25;
 
 function clampZoomPercent(n: number): number {
   return Math.min(ZOOM_MAX_PCT, Math.max(ZOOM_MIN_PCT, n));
+}
+
+/** Normalize any CSS color to #rrggbb for `<input type="color">`. */
+function cssColorToHex(color: string | undefined): string {
+  if (!color?.trim()) return '#1e1e24';
+  const c = color.trim();
+  if (c.startsWith('#')) {
+    if (c.length === 4) {
+      return `#${c[1]}${c[1]}${c[2]}${c[2]}${c[3]}${c[3]}`;
+    }
+    return c.length >= 7 ? c.slice(0, 7) : '#1e1e24';
+  }
+  if (typeof document !== 'undefined') {
+    const ctx = document.createElement('canvas').getContext('2d');
+    if (ctx) {
+      ctx.fillStyle = c;
+      const s = ctx.fillStyle as string;
+      if (s.startsWith('#') && s.length >= 7) return s.slice(0, 7);
+      const m = /rgba?\((\d+),\s*(\d+),\s*(\d+)/.exec(s);
+      if (m) {
+        const r = +m[1];
+        const g = +m[2];
+        const b = +m[3];
+        return `#${[r, g, b].map((x) => x.toString(16).padStart(2, '0')).join('')}`;
+      }
+    }
+  }
+  return '#1e1e24';
 }
 
 function propsInspectorTitle(node: LayoutElement | null): string {
@@ -696,6 +728,44 @@ export const LayoutEditor = forwardRef<LayoutEditorHandle, LayoutEditorProps>(fu
   const [zoomInputDraft, setZoomInputDraft] = useState('');
   const zoomInputId = useId();
 
+  const [bgPickerOpen, setBgPickerOpen] = useState(false);
+  const [bgPopoverPos, setBgPopoverPos] = useState({ top: 0, left: 0 });
+  const bgSwatchRef = useRef<HTMLButtonElement>(null);
+  const bgPopoverRef = useRef<HTMLDivElement>(null);
+
+  useLayoutEffect(() => {
+    if (!bgPickerOpen || !bgSwatchRef.current) return;
+    const r = bgSwatchRef.current.getBoundingClientRect();
+    const W = 200;
+    const H = 58;
+    let top = r.top - H - 10;
+    if (top < 8) top = r.bottom + 8;
+    let left = r.left + r.width / 2 - W / 2;
+    left = Math.max(8, Math.min(left, window.innerWidth - W - 8));
+    setBgPopoverPos({ top, left });
+  }, [bgPickerOpen]);
+
+  useEffect(() => {
+    if (!bgPickerOpen) return;
+    const down = (ev: Event) => {
+      const t = ev.target as Node;
+      if (bgSwatchRef.current?.contains(t)) return;
+      if (bgPopoverRef.current?.contains(t)) return;
+      setBgPickerOpen(false);
+    };
+    document.addEventListener('mousedown', down);
+    return () => document.removeEventListener('mousedown', down);
+  }, [bgPickerOpen]);
+
+  useEffect(() => {
+    if (!bgPickerOpen) return;
+    const key = (e: globalThis.KeyboardEvent) => {
+      if (e.key === 'Escape') setBgPickerOpen(false);
+    };
+    window.addEventListener('keydown', key, true);
+    return () => window.removeEventListener('keydown', key, true);
+  }, [bgPickerOpen]);
+
   const commitZoomInput = useCallback(() => {
     const raw = zoomInputDraft.trim();
     if (raw !== '') {
@@ -887,43 +957,6 @@ export const LayoutEditor = forwardRef<LayoutEditorHandle, LayoutEditorProps>(fu
               </details>
             </>
           )}
-          <details className="props-accordion" open>
-            <summary>Card</summary>
-            <div className="props-accordion-body">
-              <label>
-                Width (px)
-                <input
-                  type="number"
-                  min={100}
-                  max={2000}
-                  value={state.width}
-                  onChange={(e) =>
-                    commit({ ...state, width: Number(e.target.value) || state.width })
-                  }
-                />
-              </label>
-              <label>
-                Height (px)
-                <input
-                  type="number"
-                  min={100}
-                  max={3000}
-                  value={state.height}
-                  onChange={(e) =>
-                    commit({ ...state, height: Number(e.target.value) || state.height })
-                  }
-                />
-              </label>
-              <label>
-                Background
-                <input
-                  type="text"
-                  value={state.background ?? ''}
-                  onChange={(e) => commit({ ...state, background: e.target.value })}
-                />
-              </label>
-            </div>
-          </details>
         </aside>
 
         <div className="layout-editor-canvas-column">
@@ -1070,6 +1103,52 @@ export const LayoutEditor = forwardRef<LayoutEditorHandle, LayoutEditorProps>(fu
           <Layers className="layout-editor-footer-icon" size={14} aria-hidden />
           Deck preview
         </LayoutEditorFooterButton>
+        <div className="layout-editor-status-bar-card" aria-label="Card size and background">
+          <LayoutEditorFooterValueStrip prefix="W">
+            <input
+              type="number"
+              className="layout-editor-footer-value-input layout-editor-footer-value-input--dim"
+              min={100}
+              max={2000}
+              value={state.width}
+              onChange={(e) =>
+                commit({ ...state, width: Number(e.target.value) || state.width })
+              }
+              aria-label="Card width in pixels"
+            />
+          </LayoutEditorFooterValueStrip>
+          <span className="layout-editor-footer-value-sep" aria-hidden>
+            ×
+          </span>
+          <LayoutEditorFooterValueStrip prefix="H">
+            <input
+              type="number"
+              className="layout-editor-footer-value-input layout-editor-footer-value-input--dim"
+              min={100}
+              max={3000}
+              value={state.height}
+              onChange={(e) =>
+                commit({ ...state, height: Number(e.target.value) || state.height })
+              }
+              aria-label="Card height in pixels"
+            />
+          </LayoutEditorFooterValueStrip>
+          <LayoutEditorFooterButton
+            ref={bgSwatchRef}
+            variant="icon"
+            className="layout-editor-bg-swatch-btn"
+            onClick={() => setBgPickerOpen((o) => !o)}
+            aria-label="Card background color"
+            aria-haspopup="dialog"
+            aria-expanded={bgPickerOpen}
+          >
+            <span
+              className="layout-editor-bg-swatch-chip"
+              style={{ backgroundColor: state.background ?? '#1e1e24' }}
+              aria-hidden
+            />
+          </LayoutEditorFooterButton>
+        </div>
         <div
           className="layout-editor-zoom"
           role="group"
@@ -1085,14 +1164,18 @@ export const LayoutEditor = forwardRef<LayoutEditorHandle, LayoutEditorProps>(fu
           >
             <Minus className="layout-editor-footer-icon" size={14} strokeWidth={2} aria-hidden />
           </LayoutEditorFooterButton>
-          <label className="layout-editor-zoom-field" htmlFor={zoomInputId} title="Type zoom % — Enter to apply">
+          <LayoutEditorFooterValueStrip
+            suffix="%"
+            htmlFor={zoomInputId}
+            title="Type zoom % — Enter to apply"
+          >
             <input
               id={zoomInputId}
               type="text"
               inputMode="numeric"
               autoComplete="off"
               spellCheck={false}
-              className="layout-editor-zoom-input"
+              className="layout-editor-footer-value-input layout-editor-footer-value-input--zoom"
               aria-label="Zoom percent"
               value={zoomInputEditing ? zoomInputDraft : String(zoomDisplayPct)}
               onFocus={(e) => {
@@ -1107,10 +1190,7 @@ export const LayoutEditor = forwardRef<LayoutEditorHandle, LayoutEditorProps>(fu
               onBlur={commitZoomInput}
               onKeyDown={onZoomInputKeyDown}
             />
-            <span className="layout-editor-zoom-suffix" aria-hidden>
-              %
-            </span>
-          </label>
+          </LayoutEditorFooterValueStrip>
           <LayoutEditorFooterButton
             variant="icon"
             aria-label="Zoom in"
@@ -1122,6 +1202,28 @@ export const LayoutEditor = forwardRef<LayoutEditorHandle, LayoutEditorProps>(fu
           </LayoutEditorFooterButton>
         </div>
       </footer>
+      {bgPickerOpen &&
+        createPortal(
+          <div
+            ref={bgPopoverRef}
+            className="layout-editor-bg-popover"
+            role="dialog"
+            aria-label="Card background color"
+            style={{
+              top: bgPopoverPos.top,
+              left: bgPopoverPos.left,
+              width: 200,
+            }}
+          >
+            <input
+              type="color"
+              className="layout-editor-bg-popover-native"
+              value={cssColorToHex(state.background)}
+              onChange={(e) => commit({ ...state, background: e.target.value })}
+            />
+          </div>,
+          document.body,
+        )}
     </div>
   );
 });
