@@ -1,8 +1,8 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
+  ChevronDown,
   FileSpreadsheet,
   FolderPlus,
-  GripVertical,
   LayoutTemplate,
   MoreVertical,
   Plus,
@@ -117,8 +117,8 @@ export function CardGroupsPanel(props: {
   const [editingTitleId, setEditingTitleId] = useState<string | null>(null);
   const [urlEditorGroupId, setUrlEditorGroupId] = useState<string | null>(null);
   const [urlDraft, setUrlDraft] = useState('');
-  const dragId = useRef<string | null>(null);
-  const dragGhostRef = useRef<HTMLDivElement | null>(null);
+  /** Group ids whose gallery is collapsed (default: expanded) */
+  const [collapsedGalleryIds, setCollapsedGalleryIds] = useState<Set<string>>(() => new Set());
   const titleInputRef = useRef<HTMLInputElement>(null);
 
   const loadGroups = useCallback(async () => {
@@ -251,27 +251,6 @@ export function CardGroupsPanel(props: {
     [token, projectId, onBusy, onError],
   );
 
-  const reorderGroups = useCallback(
-    async (ordered: CardGroupDto[]) => {
-      if (!token) return;
-      const ids = ordered.map((g) => g.id);
-      onBusy(true);
-      onError(null);
-      try {
-        const res = await apiJson<{ cardGroups: CardGroupDto[] }>(
-          `/api/projects/${projectId}/card-groups/reorder`,
-          { method: 'PUT', token, body: JSON.stringify({ ids }) },
-        );
-        setGroups(res.cardGroups);
-      } catch (e) {
-        onError(e instanceof Error ? e.message : 'Reorder failed');
-      } finally {
-        onBusy(false);
-      }
-    },
-    [token, projectId, onBusy, onError],
-  );
-
   const openUrlEditor = useCallback((g: CardGroupDto) => {
     setUrlEditorGroupId(g.id);
     setUrlDraft(g.csvSourceUrl ?? '');
@@ -286,61 +265,14 @@ export function CardGroupsPanel(props: {
     [urlDraft, updateGroup],
   );
 
-  const onDragOver = (e: React.DragEvent) => {
-    e.preventDefault();
-    e.dataTransfer.dropEffect = 'move';
-  };
-
-  const onDrop = (targetId: string) => {
-    const from = dragId.current;
-    dragId.current = null;
-    if (!from || from === targetId) return;
-    const ix = groups.findIndex((g) => g.id === from);
-    if (ix < 0) return;
-    const next = [...groups];
-    const [moved] = next.splice(ix, 1);
-    const ti2 = next.findIndex((g) => g.id === targetId);
-    if (ti2 < 0) return;
-    next.splice(ti2, 0, moved);
-    void reorderGroups(next);
-  };
-
-  const onGroupDragStart = (e: React.DragEvent<HTMLElement>, g: CardGroupDto) => {
-    if (!(e.target as HTMLElement).closest('.card-group-drag')) {
-      e.preventDefault();
-      return;
-    }
-    e.dataTransfer.effectAllowed = 'move';
-    e.dataTransfer.setData('text/plain', g.id);
-    dragId.current = g.id;
-    const shell = e.currentTarget;
-    const rect = shell.getBoundingClientRect();
-    const ghost = shell.cloneNode(true) as HTMLElement;
-    ghost.style.width = `${rect.width}px`;
-    ghost.style.opacity = '0.95';
-    ghost.style.position = 'fixed';
-    ghost.style.left = '-9999px';
-    ghost.style.top = '0';
-    ghost.style.zIndex = '100000';
-    ghost.style.pointerEvents = 'none';
-    ghost.style.boxShadow = '0 16px 48px rgba(0, 0, 0, 0.5)';
-    ghost.style.borderRadius = getComputedStyle(shell).borderRadius;
-    document.body.appendChild(ghost);
-    dragGhostRef.current = ghost;
-    const ox = Math.min(56, Math.max(24, rect.width * 0.12));
-    const oy = 22;
-    try {
-      e.dataTransfer.setDragImage(ghost, ox, oy);
-    } catch {
-      /* some browsers */
-    }
-  };
-
-  const onGroupDragEnd = () => {
-    dragGhostRef.current?.remove();
-    dragGhostRef.current = null;
-    dragId.current = null;
-  };
+  const toggleGallery = useCallback((groupId: string) => {
+    setCollapsedGalleryIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(groupId)) next.delete(groupId);
+      else next.add(groupId);
+      return next;
+    });
+  }, []);
 
   const layoutStateById = useMemo(() => {
     const m = new Map<string, LayoutStateV2>();
@@ -424,21 +356,23 @@ export function CardGroupsPanel(props: {
           const layoutNm = layoutName(layoutsFull, g.layoutId);
           const dataLabel = sheetConnectionLabel(g, hasCsv);
 
+          const galleryExpanded = !collapsedGalleryIds.has(g.id);
+          const galleryPanelId = `card-group-gallery-${g.id}`;
+
           return (
-            <article
-              key={g.id}
-              className="card-group-shell"
-              draggable
-              onDragStart={(e) => onGroupDragStart(e, g)}
-              onDragEnd={onGroupDragEnd}
-              onDragOver={onDragOver}
-              onDrop={() => onDrop(g.id)}
-            >
+            <article key={g.id} className="card-group-shell">
               <header
                 className={`card-group-header${ready ? ' card-group-header--ready' : ''}`}
               >
-                <button type="button" className="card-group-drag" aria-label="Reorder group">
-                  <GripVertical size={16} strokeWidth={2} aria-hidden />
+                <button
+                  type="button"
+                  className={`card-group-chevron${galleryExpanded ? ' card-group-chevron--open' : ''}`}
+                  aria-expanded={galleryExpanded}
+                  aria-controls={galleryPanelId}
+                  onClick={() => toggleGallery(g.id)}
+                  title={galleryExpanded ? 'Collapse gallery' : 'Expand gallery'}
+                >
+                  <ChevronDown size={18} strokeWidth={2} aria-hidden />
                 </button>
 
                 <div className="card-group-title-block">
@@ -617,7 +551,13 @@ export function CardGroupsPanel(props: {
                 </div>
               )}
 
-              <div className="card-group-body">
+              <div
+                id={galleryPanelId}
+                className="card-group-body"
+                hidden={!galleryExpanded}
+                role="region"
+                aria-label={`${g.name} gallery`}
+              >
                 {!canPreview(g) ? (
                   <p className="card-group-ghost muted">
                     Select a Layout and Data Source to preview cards.
