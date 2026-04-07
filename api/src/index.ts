@@ -11,14 +11,7 @@ import { assetsRouter } from './routes/assets.js';
 import { exportsRouter } from './routes/exports.js';
 import { rootLogger } from './lib/logger.js';
 
-const repoRoot = join(dirname(fileURLToPath(import.meta.url)), '../..');
-if (process.env.NODE_ENV !== 'production') {
-  const localEnv = join(repoRoot, '.env.local');
-  if (existsSync(localEnv)) {
-    const { config } = await import('dotenv');
-    config({ path: localEnv });
-  }
-}
+// Local DATABASE_URL etc.: use `pnpm dev` so dotenv-cli loads ../.env.local before any imports (Prisma reads env at init).
 
 const app = express();
 const port = Number(process.env.PORT) || 3001;
