@@ -41,7 +41,7 @@ resource "aws_ecs_task_definition" "api" {
       { name = "NODE_ENV", value = "production" },
       { name = "PORT", value = "3001" },
       { name = "AWS_REGION", value = var.aws_region },
-      { name = "DATABASE_URL", value = "postgresql://${var.db_username}:${var.db_password}@${var.db_endpoint}:${var.db_port}/${var.db_name}" },
+      { name = "DATABASE_URL", value = "postgresql://${var.db_username}:${var.db_password}@${var.db_endpoint}:${var.db_port}/${var.db_name}?sslmode=require" },
       { name = "SQS_QUEUE_URL", value = var.pdf_queue_url },
       { name = "S3_BUCKET_ASSETS", value = var.assets_bucket_name },
       { name = "S3_BUCKET_EXPORTS", value = var.exports_bucket_name },

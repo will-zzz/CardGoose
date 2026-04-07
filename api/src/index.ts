@@ -1,4 +1,3 @@
-import { config as loadEnv } from 'dotenv';
 import { randomUUID } from 'node:crypto';
 import { existsSync } from 'node:fs';
 import { dirname, join } from 'node:path';
@@ -16,7 +15,8 @@ const repoRoot = join(dirname(fileURLToPath(import.meta.url)), '../..');
 if (process.env.NODE_ENV !== 'production') {
   const localEnv = join(repoRoot, '.env.local');
   if (existsSync(localEnv)) {
-    loadEnv({ path: localEnv });
+    const { config } = await import('dotenv');
+    config({ path: localEnv });
   }
 }
 

@@ -117,6 +117,18 @@ resource "aws_security_group" "rds" {
   tags = {
     Name = "${local.name_prefix}-rds-sg"
   }
+
+  # Do not add more inline ingress blocks here: edits can force SG replacement, which fails while RDS uses this SG.
+}
+
+# Same SG pattern as rds_from_dev: avoids editing aws_security_group.rds inline ingress in ways that replace the SG.
+resource "aws_vpc_security_group_ingress_rule" "rds_from_api_task" {
+  security_group_id            = aws_security_group.rds.id
+  description                  = "Postgres from API Fargate task (api SG)"
+  referenced_security_group_id = aws_security_group.api.id
+  from_port                      = 5432
+  to_port                        = 5432
+  ip_protocol                    = "tcp"
 }
 
 resource "aws_vpc_security_group_ingress_rule" "rds_from_dev" {
