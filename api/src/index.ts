@@ -51,6 +51,21 @@ app.use('/api/projects', projectsRouter);
 app.use('/api', assetsRouter);
 app.use('/api', exportsRouter);
 
+const appDir = dirname(fileURLToPath(import.meta.url));
+const publicDir = join(appDir, 'public');
+if (existsSync(publicDir) && process.env.NODE_ENV === 'production') {
+  rootLogger.info({ publicDir }, 'Serving SPA from API container');
+  app.use(express.static(publicDir));
+  app.get('*', (req, res, next) => {
+    if (req.method !== 'GET' && req.method !== 'HEAD') return next();
+    if (req.path.startsWith('/api')) return next();
+    if (req.path === '/health') return next();
+    res.sendFile(join(publicDir, 'index.html'), (err) => {
+      if (err) next(err);
+    });
+  });
+}
+
 app.listen(port, () => {
   rootLogger.info(
     {

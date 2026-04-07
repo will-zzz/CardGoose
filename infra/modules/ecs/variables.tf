@@ -91,12 +91,12 @@ variable "desired_count" {
 }
 
 variable "worker_render_url" {
-  description = "HTTPS origin the PDF worker loads for /render (CloudFront URL, no trailing slash)."
+  description = "HTTP origin for the PDF worker to load /render (ALB URL, no trailing slash)."
   type        = string
 }
 
 variable "cors_origin" {
-  description = "Browser origin allowed by the API (e.g. https://dxxx.cloudfront.net). Passed as CORS_ORIGIN."
+  description = "Browser origin for CORS (ALB URL when SPA is served from the API container)."
   type        = string
 }
 

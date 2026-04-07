@@ -60,21 +60,13 @@ output "sns_alerts_topic_arn" {
 }
 
 output "public_api_url" {
-  description = "Direct ALB URL (HTTP). Prefer the CloudFront URL for browsers; use this for debugging."
+  description = "ALB URL (HTTP): React SPA, /api/*, /health, and /render are served from the API ECS task."
   value       = "http://${module.alb.alb_dns_name}"
 }
 
 output "frontend_url" {
-  description = "Production app URL: SPA + /api/* and /health proxied to the API (set VITE_API_URL empty for same-origin)."
-  value       = module.frontend_static.site_url
-}
-
-output "frontend_bucket_name" {
-  value = module.frontend_static.bucket_name
-}
-
-output "cloudfront_distribution_id" {
-  value = module.frontend_static.cloudfront_distribution_id
+  description = "Same as public_api_url — open this in a browser (no separate CDN)."
+  value       = "http://${module.alb.alb_dns_name}"
 }
 
 output "alb_dns_name" {
