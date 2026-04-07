@@ -126,9 +126,9 @@ resource "aws_vpc_security_group_ingress_rule" "rds_from_api_task" {
   security_group_id            = aws_security_group.rds.id
   description                  = "Postgres from API Fargate task (api SG)"
   referenced_security_group_id = aws_security_group.api.id
-  from_port                      = 5432
-  to_port                        = 5432
-  ip_protocol                    = "tcp"
+  from_port                    = 5432
+  to_port                      = 5432
+  ip_protocol                  = "tcp"
 }
 
 resource "aws_vpc_security_group_ingress_rule" "rds_from_dev" {
