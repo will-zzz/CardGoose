@@ -21,7 +21,9 @@ FROM node:20-alpine AS production
 RUN npm install -g prisma@6.19.3
 WORKDIR /app
 ENV NODE_ENV=production
+# Workspace root .pnpm store + api/node_modules symlinks (pnpm does not hoist cors etc. to root node_modules)
 COPY --from=build /app/node_modules ./node_modules
+COPY --from=build /app/api/node_modules ./api/node_modules
 COPY --from=build /app/api/dist ./api/dist
 COPY --from=build /app/api/package.json ./api/package.json
 COPY --from=build /app/api/prisma ./api/prisma
