@@ -107,13 +107,17 @@ resource "aws_ecs_service" "api" {
     container_port   = 3001
   }
 
+  # Let prisma migrate + Node boot complete before ALB health checks fail the target.
+  health_check_grace_period_seconds = 120
+
   network_configuration {
     subnets          = var.public_subnet_ids
     security_groups  = [var.api_security_group_id, var.ecs_tasks_security_group_id]
     assign_public_ip = true
   }
 
-  deployment_minimum_healthy_percent = 0
+  # With desired_count=1, 0% allows the only task to stop before the new one is healthy → 502/503 during deploy.
+  deployment_minimum_healthy_percent = 100
   deployment_maximum_percent         = 200
 }
 

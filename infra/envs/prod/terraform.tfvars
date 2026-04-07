@@ -4,8 +4,9 @@ aws_region = "us-east-1"
 environment  = "prod"
 project_name = "cardboardforge"
 
-# Hybrid dev: local API + Prisma reach RDS; scale ECS to 0 so local worker owns SQS.
-ecs_desired_count = 0
+# Must be >= 1 for the public ALB to serve traffic (0 tasks = HTTP 503 from the load balancer).
+# Use 0 only when you intentionally want no Fargate tasks (e.g. local-only dev against RDS).
+ecs_desired_count = 1
 
 # Public IPs as /32 so local Prisma can reach RDS (add home, school, etc.). curl -s https://checkip.amazonaws.com
 rds_dev_access_cidrs = [
