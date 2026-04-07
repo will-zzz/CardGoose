@@ -82,7 +82,12 @@ jobs:
       - uses: actions/checkout@v4
 
       - name: Build API image
-        run: docker build -f api/Dockerfile .
+        run: docker build -f api/Dockerfile -t cardboardforge-api-ci .
+
+      - name: Verify API image resolves runtime deps (pnpm workspace layout)
+        run: |
+          docker run --rm -w /app/api cardboardforge-api-ci \
+            node --input-type=module -e "await import('cors'); console.log('cors ok');"
 
       - name: Build worker image
         run: docker build -f worker/Dockerfile worker
@@ -147,8 +152,11 @@ jobs:
         env:
           ECR_API: ${{ secrets.ECR_API_REPOSITORY_URL }}
         run: |
-          docker build -f api/Dockerfile -t "$ECR_API:${{ github.sha }}" -t "$ECR_API:latest" .
-          docker push "$ECR_API:${{ github.sha }}"
+          IMG="${ECR_API}:${{ github.sha }}"
+          docker build -f api/Dockerfile -t "$IMG" -t "$ECR_API:latest" .
+          docker run --rm -w /app/api "$IMG" \
+            node --input-type=module -e "await import('cors'); console.log('cors ok');"
+          docker push "$IMG"
           docker push "$ECR_API:latest"
 
       - name: Build and push worker image
