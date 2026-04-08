@@ -1,25 +1,8 @@
-# CardGoose
+<h1 align="center">
+   CardGoose 🃏🪿
+</h1>
 
-**CardGoose** is a board game prototyping engine: data-driven design, Print & Play PDFs, and Tabletop Simulator exports. The stack is a TypeScript API and React dashboard, a Python “Baker” worker for headless rendering, and optional AWS hosting (RDS, S3, SQS, ECS).
-
-## Roadmap
-
-Planned work (edit this list as you ship):
-
-- [ ] Richer card layout and template tooling in the editor
-- [ ] Additional export targets beyond PDF / legacy JSON
-- [ ] Deeper Tabletop Simulator workflow (assets, scripting hooks)
-- [ ] Collaboration and project sharing
-- [ ] Automated E2E tests against a compose or staging stack
-
-## Monorepo layout
-
-| Path       | Description                         |
-| ---------- | ----------------------------------- |
-| `frontend` | Vite + React + Tailwind (dashboard) |
-| `api`      | Node.js API (Express, Prisma, AWS)  |
-| `worker`   | Python Baker (Playwright rendering) |
-| `infra`    | Terraform (AWS)                     |
+<h4 align="center">A tool to make board games for Print & Play and <a href="https://www.tabletopsimulator.com/" target="_blank">Tabletop Simulator.</a></h4>
 
 ## Prerequisites
 
