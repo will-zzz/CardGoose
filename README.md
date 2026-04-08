@@ -1,8 +1,10 @@
-<h1 align="center">
-   CardGoose 🃏🪿
-</h1>
+<p align="center">
+  <img src=".github/readme-assets/banner.png" alt="CardGoose — board games for Print &amp; Play and Tabletop Simulator" width="100%" />
+</p>
 
-<h4 align="center">A tool to make board games for Print & Play and <a href="https://www.tabletopsimulator.com/" target="_blank">Tabletop Simulator.</a></h4>
+<p align="center">
+  A tool to make board games for <strong>Print &amp; Play</strong> and <a href="https://www.tabletopsimulator.com/">Tabletop Simulator</a>.
+</p>
 
 ## Prerequisites
 
