@@ -144,13 +144,13 @@ function DashboardBar() {
       <div className="studio-shell-row">
         <Link
           to="/"
-          className="studio-shell-brand"
+          className="studio-shell-brand studio-shell-brand--mark-only"
           onClick={(e) => layoutEditor?.onNavigateHomeClick(e)}
+          aria-label="CardGoose home"
         >
           <span className="studio-shell-logo" aria-hidden>
-            <BrandLogo heightPx={20} />
+            <BrandLogo heightPx={44} />
           </span>
-          <span className="studio-shell-brand-text">CardGoose</span>
         </Link>
         <div className="studio-shell-fill" aria-hidden />
         <AccountMenu />
@@ -188,7 +188,7 @@ function ProjectTabsBar() {
             aria-label="Home"
           >
             <span className="studio-shell-logo" aria-hidden>
-              <BrandLogo heightPx={20} />
+              <BrandLogo heightPx={36} />
             </span>
           </Link>
           <span className="studio-shell-project-name">{projectName}</span>
@@ -224,7 +224,7 @@ function ProjectLoadingBar() {
         <div className="studio-shell-left">
           <Link to="/" className="studio-shell-brand studio-shell-brand--compact" aria-label="Home">
             <span className="studio-shell-logo" aria-hidden>
-              <BrandLogo heightPx={20} />
+              <BrandLogo heightPx={36} />
             </span>
           </Link>
           <span className="studio-shell-project-name studio-shell-project-name--muted">
@@ -306,7 +306,7 @@ function EditorBar() {
             aria-label="Home"
           >
             <span className="studio-shell-logo" aria-hidden>
-              <BrandLogo heightPx={18} />
+              <BrandLogo heightPx={30} />
             </span>
           </Link>
           <ChevronRight size={14} className="editor-bc-sep" aria-hidden />
