@@ -8,8 +8,8 @@ project_name = "cardboardforge"
 # Use 0 only when you intentionally want no Fargate tasks (e.g. local-only dev against RDS).
 ecs_desired_count = 1
 
-# Public IPs as /32 so local Prisma can reach RDS (add home, school, etc.). curl -s https://checkip.amazonaws.com
-rds_dev_access_cidrs = [
-  "98.26.44.239/32", # home
-  "152.3.43.55/32",  # school / other — change if your IP changes
-]
+# Public IPs as /32 so local Prisma can reach RDS. Do not commit real addresses here.
+# Option A — shell (same apply session):
+#   export TF_VAR_rds_dev_access_cidrs='["203.0.113.10/32","198.51.100.2/32"]'
+# Option B — copy rds.auto.tfvars.example → rds.auto.tfvars (gitignored) and edit there.
+# Default stays empty in committed config; omit TF_VAR / file to keep RDS ECS-only.

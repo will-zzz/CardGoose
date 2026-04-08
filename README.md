@@ -1,119 +1,156 @@
-# CardboardForge (Cardboard Forge)
+# CardGoose
 
-Board game prototyping engine: data-driven design, Print & Play PDFs, and Tabletop Simulator exports.
+**CardGoose** is a board game prototyping engine: data-driven design, Print & Play PDFs, and Tabletop Simulator exports. The stack is a TypeScript API and React dashboard, a Python “Baker” worker for headless rendering, and optional AWS hosting (RDS, S3, SQS, ECS).
+
+## Roadmap
+
+Planned work (edit this list as you ship):
+
+- [ ] Richer card layout and template tooling in the editor
+- [ ] Additional export targets beyond PDF / legacy JSON
+- [ ] Deeper Tabletop Simulator workflow (assets, scripting hooks)
+- [ ] Collaboration and project sharing
+- [ ] Automated E2E tests against a compose or staging stack
 
 ## Monorepo layout
 
-| Path       | Description                          |
-| ---------- | ------------------------------------ |
-| `frontend` | Vite + React + Tailwind (dashboard)  |
-| `api`      | Node.js API (Express, Prisma, AWS)   |
-| `worker`   | Python "Baker" (Playwright rendering) |
-| `infra`    | Terraform (AWS)                      |
+| Path       | Description                           |
+| ---------- | ------------------------------------- |
+| `frontend` | Vite + React + Tailwind (dashboard)   |
+| `api`      | Node.js API (Express, Prisma, AWS)    |
+| `worker`   | Python Baker (Playwright rendering)   |
+| `infra`    | Terraform (AWS)                     |
 
 ## Prerequisites
 
 - Node.js 20+
 - [pnpm](https://pnpm.io/) 9+
-- Python 3.x + `boto3` (worker; `pip install boto3` if needed)
-- [AWS CLI](https://docs.aws.amazon.com/cli/latest/userguide/getting-started-install.html) configured (`~/.aws/credentials`) for real AWS
-- Docker — only if you use the **Docker + LocalStack** path below
-- Terraform 1.9+ — for infra and for opening RDS to your laptop (hybrid path)
+- Python 3.x + `boto3` for the worker (`pip install boto3` if needed)
+- [AWS CLI](https://docs.aws.amazon.com/cli/latest/userguide/getting-started-install.html) when using **hybrid** or **production** against real AWS
+- Docker — required for **fully local** (Postgres + LocalStack) and useful for optional compose services
+- Terraform 1.9+ — for **hybrid** (RDS access from your IP) and **production** (full AWS stack)
 
-## Quick start
+---
 
-```bash
-pnpm install
-pnpm dev:frontend
-```
+## Development modes
 
-See [infra/BOOTSTRAP.md](infra/BOOTSTRAP.md) for AWS account and Terraform state setup.
+Pick one path. They differ by **where Postgres and object/queue services run**, not by repo layout.
 
-## Local development (hybrid — real AWS)
+| Mode            | Frontend | API & worker | Database   | Buckets & queue      |
+| --------------- | -------- | ------------ | ---------- | -------------------- |
+| **Fully local** | Your Mac | Your Mac     | Docker     | LocalStack (emulated) |
+| **Hybrid**      | Your Mac | Your Mac     | AWS RDS    | AWS S3 & SQS         |
+| **Production**  | ECS\*    | ECS          | AWS RDS    | AWS S3 & SQS         |
 
-Use this for day-to-day work: **Vite, the API, and the worker all run on your machine**, but they use **real RDS, S3, and SQS** in `us-east-1`. You get hot reload and fast restarts without deploying containers.
+\*The API container can serve the built SPA in production (`NODE_ENV=production`). Until you add a stable URL (ALB, CloudFront, etc.), you may use the task public IP for smoke tests.
 
-**1. One-time / occasional Terraform** ([`infra/envs/prod`](infra/envs/prod)):
+### Fully local (Docker Postgres + LocalStack)
 
-- Set `rds_dev_access_cidrs` in `terraform.tfvars` to one or more public IPs as `/32` (e.g. from `curl -s https://checkip.amazonaws.com`)—for example home and school Wi‑Fi. Update entries when your IP changes.
-- Set `ecs_desired_count = 0` so Fargate tasks are not running (avoids paying for idle services and avoids a second consumer on the same SQS queue while you run the worker locally).
+Use this when you want **no AWS calls**: everything emulated or on your machine.
+
+1. **Start backing services** (Postgres on host port **5433**, LocalStack on **4566**):
+
+   ```bash
+   pnpm docker:up
+   ```
+
+   Optional: `docker compose build` if you use the `api` / `worker` compose services.
+
+2. **Configure** [`.env.local.example`](.env.local.example) → **`.env.local`** at the repo root using the **“full local stack”** block: `DATABASE_URL` pointing at `localhost:5433`, `AWS_ENDPOINT_URL=http://localhost:4566`, and bucket/queue names **`cardgoose-*`** (they must match [`docker-compose.yml`](docker-compose.yml) and [`docker/localstack-ready.d/init-aws.sh`](docker/localstack-ready.d/init-aws.sh)).
+
+3. **Migrations:**
+
+   ```bash
+   pnpm migrate:deploy
+   ```
+
+4. **Run three processes** (three terminals from the repo root):
+
+   ```bash
+   pnpm dev:api
+   pnpm dev:frontend
+   ```
+
+   ```bash
+   cd worker
+   PYTHONPATH=src python3 -m baker.main
+   ```
+
+5. Open the URL Vite prints (often `http://localhost:5173`).
+
+Do **not** set `VITE_API_URL` in `frontend/.env.local` if the Vite dev server should proxy `/api` and `/health` to `http://localhost:3001` (see [`frontend/vite.config.ts`](frontend/vite.config.ts)).
+
+**PDF exports:** set **`RENDER_URL`** in `.env.local` to the exact origin Vite prints (including port). If the worker runs in Docker and Vite on the host, use something like `http://host.docker.internal:5173`. Restart the worker after changes.
+
+---
+
+### Hybrid (local apps, real AWS)
+
+Use this for day-to-day work: **Vite, the API, and the worker on your laptop** with **real RDS, S3, and SQS** in `us-east-1`. You get hot reload without deploying containers.
+
+**1. Terraform (occasional)** — in [`infra/envs/prod`](infra/envs/prod):
+
+- Allow your laptop to reach RDS: set `rds_dev_access_cidrs` without committing real IPs — e.g. `export TF_VAR_rds_dev_access_cidrs='["YOUR.PUBLIC.IP/32"]'` before `terraform apply`, or copy [`infra/envs/prod/rds.auto.tfvars.example`](infra/envs/prod/rds.auto.tfvars.example) to **`rds.auto.tfvars`** (gitignored). Update when your IP changes.
+- Set `ecs_desired_count = 0` for the **worker** service if you run the Python worker locally (avoids two consumers on the same SQS queue and idle Fargate cost).
 - Run `terraform apply`.
 
-**2. Root `.env.local`**
+**2. Root `.env.local`** — copy [`.env.local.example`](.env.local.example) and fill **real** values:
 
-Copy [`.env.local.example`](.env.local.example) to **`.env.local`** and fill it with real values:
+- **`DATABASE_URL`** — RDS host, user `forge`, password from `terraform output -raw rds_master_password`, database name from your RDS instance (by default Terraform uses the `project_name` value, e.g. `cardboardforge`).
+- **`S3_BUCKET_ASSETS`**, **`S3_BUCKET_EXPORTS`**, **`SQS_QUEUE_URL`** — from `terraform output` (`assets_bucket_name`, `exports_bucket_name`, `pdf_queue_url`).
 
-- `DATABASE_URL` — RDS host, user `forge`, password from `cd infra/envs/prod && terraform output -raw rds_master_password`, database `cardboardforge`.
-- `S3_BUCKET_ASSETS`, `S3_BUCKET_EXPORTS`, `SQS_QUEUE_URL` — from `terraform output` (`assets_bucket_name`, `exports_bucket_name`, `pdf_queue_url`).
+Do **not** set `AWS_ACCESS_KEY_ID` / `AWS_SECRET_ACCESS_KEY` / `AWS_ENDPOINT_URL` for real AWS: use the default credential chain (`~/.aws/credentials` or SSO).
 
-Do **not** set `AWS_ACCESS_KEY_ID` / `AWS_SECRET_ACCESS_KEY` / `AWS_ENDPOINT_URL` here: the Node API and boto3 use the **default credential chain** (`~/.aws/credentials`).
+**3. Frontend:** do **not** set `VITE_API_URL` in `frontend/.env.local` (or remove it) so the dev server proxies to the local API.
 
-**3. Do not set `VITE_API_URL` in `frontend/.env.local`** (or remove that file). The Vite dev server proxies `/api` and `/health` to `http://localhost:3001` ([`frontend/vite.config.ts`](frontend/vite.config.ts)).
-
-**4. Apply migrations once** (or whenever the schema changes):
+**4. Migrations:**
 
 ```bash
 pnpm migrate:deploy
 ```
 
-**5. Run three processes** (three terminals from the repo root):
+**5. Run** `pnpm dev:api`, `pnpm dev:frontend`, and the worker as in the fully local section.
 
-```bash
-# Terminal 1 — API
-pnpm dev:api
+**Queue contention:** if the **ECS worker** is scaled up, it shares the same SQS URL as your laptop. For predictable local PDF debugging, keep ECS worker desired count at **0** while testing locally.
 
-# Terminal 2 — frontend
-pnpm dev:frontend
-```
+**Frontend-only against a cloud API:** set `VITE_API_URL=http://<ecs-task-public-ip>:3001` in `frontend/.env.local` and run `pnpm dev:frontend` only. Find the task IP in the ECS console (see [`frontend/.env.local.example`](frontend/.env.local.example)). This is still “hybrid” from the browser’s perspective (local UI, remote API).
 
-Open the URL Vite prints (often `http://localhost:5173`).
+**Troubleshooting RDS:** if Prisma cannot connect, confirm your IP is in `rds_dev_access_cidrs`, re-apply Terraform, and that `DATABASE_URL` matches `terraform output -raw rds_endpoint`.
 
-```bash
-# Terminal 3 — worker (reads S3_BUCKET_EXPORTS, SQS_QUEUE_URL, AWS_REGION, etc. from repo `.env.local`)
-cd worker
-PYTHONPATH=src python3 -m baker.main
-```
+---
 
-Variables already set in your shell override `.env.local`. Set `LOG_LEVEL=DEBUG` (or another level) in `.env.local` or prefix the command if you want more verbose worker logs.
+### Production (deployed on AWS)
 
-**What is local vs cloud:** the browser, Vite, Node API, and Python worker are **local**. RDS, S3, and SQS are **AWS**. The API talks to RDS, S3, and SQS; the worker polls SQS and writes export artifacts to S3.
+**Production** means the **API and worker run on ECS Fargate**, with **RDS, S3, and SQS** provisioned by Terraform. CI can build and push images and force new deployments (see [`.github/workflows/ci.yml`](.github/workflows/ci.yml)).
 
-**PDF export:** add **`RENDER_URL`** to `.env.local` (no trailing slash). It must be the **exact origin Vite prints** (e.g. `Local: http://localhost:5174/` when port 5173 is already in use—if Playwright points at the wrong port, the job can hang until timeout and nothing new appears in S3). Use `http://host.docker.internal:5174` if the worker runs in Docker and Vite on the host. Restart the worker after changing it.
+1. **Bootstrap and apply** — follow [infra/BOOTSTRAP.md](infra/BOOTSTRAP.md) for remote state, then apply [`infra/envs/prod`](infra/envs/prod). Resource names, buckets, queues, and the RDS database name follow your Terraform variables (defaults in this repo still use the historical `cardboardforge` prefix for AWS resources).
 
-**Same SQS queue as production:** your `.env.local` often uses the **prod** `SQS_QUEUE_URL`. If the **ECS worker** service in AWS is running (`desired_count` ≥ 1), it **shares the queue** with your laptop—messages may be processed in the cloud (or fail there) while your local worker sits idle with no logs. For local PDF debugging, set the ECS **worker** service desired count to **0** (console or Terraform), then run `PYTHONPATH=src python3 -m baker.main` locally. Scale ECS back up when done.
+2. **Runtime config** — ECS tasks receive env vars from Terraform (not from `.env.local`). For **one-off Prisma operations** against production RDS (migrations, introspection), copy [`.env.production.example`](.env.production.example) to **`.env.production`** (never commit) with values that match your live stack:
 
-If exports stay empty: check **SQS** approximate messages visible / in flight in the AWS console, **CloudWatch** logs for the ECS worker task, and local worker logs for `SQS message:` / `PDF render start`.
+   ```bash
+   pnpm migrate:deploy:prod
+   ```
 
-**Smoke test (legacy JSON):** the old `POST /export` path still enqueues a tiny JSON status file for queue testing.
+3. **Deploys** — pushes to `main` run lint, tests, Terraform validate, Docker builds, and (with secrets configured) ECR push + ECS `update-service --force-new-deployment`. Adjust branch rules in the workflow if your default branch differs.
 
-**If Prisma cannot reach RDS** (`Can't reach database server at …rds.amazonaws.com`): add your current public IP as a `/32` entry in `rds_dev_access_cidrs` in `infra/envs/prod/terraform.tfvars`, run `terraform apply`, and confirm `DATABASE_URL` in `.env.local` matches `terraform output -raw rds_endpoint`.
+4. **Smoke checks** — hit `/health` on a running API task; confirm `service` identifies as `cardgoose-api`. Scale worker and API services in ECS per load and cost.
 
-## Local development (Docker + LocalStack)
-
-Use this if you want **everything** emulated locally (no AWS calls from the API/worker):
-
-```bash
-pnpm docker:up
-# optional: build API + worker images
-docker compose build
-```
-
-Then follow [`.env.local.example`](.env.local.example) for `DATABASE_URL` pointing at Docker Postgres, `AWS_ENDPOINT_URL=http://localhost:4566`, and LocalStack bucket/queue names. Run `pnpm migrate:deploy`, then `pnpm dev:api`, the worker, and `pnpm dev:frontend` as in the hybrid section.
+---
 
 ## Environment files
 
 | File | Purpose |
 | ---- | ------- |
 | [`.env.local.example`](.env.local.example) | Template for **local** dev — copy to **`.env.local`** at the repo root. |
-| [`.env.production.example`](.env.production.example) | Template for **AWS** — copy to **`.env.production`** for Prisma against RDS or tooling (never commit). |
+| [`.env.production.example`](.env.production.example) | Template for **production DB / ops** — copy to **`.env.production`** for Prisma and tooling (never commit). |
 
-The API loads **`.env.local`** in development (`NODE_ENV !== production`). Prisma CLI uses `dotenv -e ../.env.local` (or `../.env.production` via `pnpm migrate:deploy:prod`). The Baker worker loads the same **`.env.local`** at the repo root when you run it locally (via `python-dotenv`; variables already in the environment still win).
+The API loads **`.env.local`** when `NODE_ENV` is not `production`. Prisma CLI uses `dotenv -e ../.env.local` or `../.env.production` via the `prisma:deploy` scripts. The Baker worker loads the same **`.env.local`** when run locally (`python-dotenv`; existing environment variables win).
 
-If you still have a single **`.env`** from an older setup, rename it to **`.env.local`** (or merge into `.env.local` and delete `.env`).
+If you still have a single **`.env`** from an older setup, merge into `.env.local` and remove `.env`.
 
 **Docker Compose API:** `docker compose up api` runs `prisma migrate deploy` before `node` (see [`docker-compose.yml`](docker-compose.yml)).
 
-**Frontend-only against a cloud API:** set `VITE_API_URL=http://<ecs-task-public-ip>:3001` in `frontend/.env.local` and run `pnpm dev:frontend` only (no local API). Until you add an ALB, the task public IP can change on redeploy.
+---
 
 ## Checks
 

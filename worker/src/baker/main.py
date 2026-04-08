@@ -28,9 +28,9 @@ def main() -> None:
     signal.signal(signal.SIGINT, _handle_sig)
     signal.signal(signal.SIGTERM, _handle_sig)
 
-    log.info("cardboardforge-baker starting")
+    log.info("cardgoose-baker starting")
     poll_forever(shutdown_event=shutdown)
-    log.info("cardboardforge-baker stopped")
+    log.info("cardgoose-baker stopped")
 
 
 if __name__ == "__main__":

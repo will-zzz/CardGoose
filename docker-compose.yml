@@ -1,25 +1,25 @@
 services:
   postgres:
     image: postgres:16-alpine
-    container_name: cardboardforge-postgres
+    container_name: cardgoose-postgres
     environment:
       POSTGRES_USER: forge
       POSTGRES_PASSWORD: forge
-      POSTGRES_DB: cardboardforge
+      POSTGRES_DB: cardgoose
     # Host 5433 avoids conflict when another Postgres (or Docker) already uses 5432.
     ports:
       - "5433:5432"
     volumes:
       - pgdata:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U forge -d cardboardforge"]
+      test: ["CMD-SHELL", "pg_isready -U forge -d cardgoose"]
       interval: 5s
       timeout: 5s
       retries: 5
 
   localstack:
     image: localstack/localstack:3
-    container_name: cardboardforge-localstack
+    container_name: cardgoose-localstack
     ports:
       - "4566:4566"
     environment:
@@ -33,20 +33,20 @@ services:
     build:
       context: .
       dockerfile: api/Dockerfile
-    container_name: cardboardforge-api
+    container_name: cardgoose-api
     ports:
       - "3001:3001"
     environment:
       NODE_ENV: production
       PORT: "3001"
-      DATABASE_URL: postgresql://forge:forge@postgres:5432/cardboardforge
+      DATABASE_URL: postgresql://forge:forge@postgres:5432/cardgoose
       AWS_REGION: us-east-1
       AWS_ACCESS_KEY_ID: test
       AWS_SECRET_ACCESS_KEY: test
       AWS_ENDPOINT_URL: http://localstack:4566
-      S3_BUCKET_ASSETS: cardboardforge-assets
-      S3_BUCKET_EXPORTS: cardboardforge-exports
-      SQS_QUEUE_URL: http://localstack:4566/000000000000/cardboardforge-pdf-generation
+      S3_BUCKET_ASSETS: cardgoose-assets
+      S3_BUCKET_EXPORTS: cardgoose-exports
+      SQS_QUEUE_URL: http://localstack:4566/000000000000/cardgoose-pdf-generation
       JWT_SECRET: dev-only-change-me
     command: ["sh", "-c", "npx prisma migrate deploy && node dist/index.js"]
     depends_on:
@@ -59,15 +59,15 @@ services:
     build:
       context: ./worker
       dockerfile: Dockerfile
-    container_name: cardboardforge-worker
+    container_name: cardgoose-worker
     environment:
       AWS_REGION: us-east-1
       AWS_ACCESS_KEY_ID: test
       AWS_SECRET_ACCESS_KEY: test
       AWS_ENDPOINT_URL: http://localstack:4566
-      S3_BUCKET_ASSETS: cardboardforge-assets
-      S3_BUCKET_EXPORTS: cardboardforge-exports
-      SQS_QUEUE_URL: http://localstack:4566/000000000000/cardboardforge-pdf-generation
+      S3_BUCKET_ASSETS: cardgoose-assets
+      S3_BUCKET_EXPORTS: cardgoose-exports
+      SQS_QUEUE_URL: http://localstack:4566/000000000000/cardgoose-pdf-generation
       PYTHONPATH: /app/src
     depends_on:
       - localstack

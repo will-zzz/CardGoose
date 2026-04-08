@@ -1,5 +1,5 @@
 {
-  "name": "cardboardforge",
+  "name": "cardgoose",
   "private": true,
   "scripts": {
     "dev:frontend": "pnpm --filter frontend dev",

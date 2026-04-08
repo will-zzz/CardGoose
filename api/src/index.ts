@@ -36,7 +36,7 @@ app.use(
 app.use(express.json());
 
 app.get('/health', (_req, res) => {
-  res.json({ status: 'ok', service: 'cardboardforge-api' });
+  res.json({ status: 'ok', service: 'cardgoose-api' });
 });
 
 app.use('/api/auth', authRouter);

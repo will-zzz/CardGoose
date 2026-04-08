@@ -285,7 +285,7 @@ projectsRouter.post('/:id/csv/refresh', async (req, res) => {
   try {
     const r = await fetch(href, {
       redirect: 'follow',
-      headers: { 'User-Agent': 'CardboardForge/1.0', Accept: 'text/csv,*/*' },
+      headers: { 'User-Agent': 'CardGoose/1.0', Accept: 'text/csv,*/*' },
     });
     if (!r.ok) {
       res.status(502).json({ error: `Fetch failed: ${r.status} ${r.statusText}` });
@@ -344,7 +344,7 @@ async function downloadAndParseCsv(href: string): Promise<{
 }> {
   const r = await fetch(href, {
     redirect: 'follow',
-    headers: { 'User-Agent': 'CardboardForge/1.0', Accept: 'text/csv,*/*' },
+    headers: { 'User-Agent': 'CardGoose/1.0', Accept: 'text/csv,*/*' },
   });
   if (!r.ok) {
     throw new Error(`Fetch failed: ${r.status} ${r.statusText}`);

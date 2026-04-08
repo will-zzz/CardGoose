@@ -3,9 +3,9 @@ requires = ["setuptools>=61"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "cardboardforge-baker"
+name = "cardgoose-baker"
 version = "0.0.1"
-description = "CardboardForge PDF/TTS rendering worker (Baker)"
+description = "CardGoose PDF/TTS rendering worker (Baker)"
 readme = "README.md"
 requires-python = ">=3.12"
 dependencies = []

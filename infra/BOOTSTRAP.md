@@ -1,6 +1,6 @@
 # AWS & Terraform bootstrap
 
-This guide covers creating a new AWS account for CardboardForge, configuring the CLI, and bootstrapping Terraform **remote state** (S3 + DynamoDB). After that, apply from [`envs/prod`](../envs/prod) (single AWS environment).
+This guide covers creating a new AWS account for CardGoose, configuring the CLI, and bootstrapping Terraform **remote state** (S3 + DynamoDB). After that, apply from [`envs/prod`](../envs/prod) (single AWS environment).
 
 ## 1. Create an AWS account
 

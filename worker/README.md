@@ -1,4 +1,4 @@
-# CardboardForge Baker (worker)
+# CardGoose Baker (worker)
 
 Python worker that consumes SQS jobs and renders **Print & Play PDFs** (via Playwright + `/render`) or legacy JSON test artifacts.
 

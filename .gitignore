@@ -29,6 +29,8 @@ venv/
 *.tfstate
 *.tfstate.*
 crash.log
+# Local RDS allowlist (your public IPs) — use TF_VAR_rds_dev_access_cidrs or this file
+infra/envs/prod/rds.auto.tfvars
 
 # IDE / OS
 .DS_Store

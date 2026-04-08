@@ -1,0 +1,7 @@
+# Copy to rds.auto.tfvars in this directory (gitignored) and set your /32 CIDRs.
+# Or use: export TF_VAR_rds_dev_access_cidrs='["203.0.113.10/32"]'
+# Get current IP: curl -s https://checkip.amazonaws.com
+
+rds_dev_access_cidrs = [
+  "98.26.44.239/32",
+]

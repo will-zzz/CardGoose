@@ -41,8 +41,8 @@ variable "ecs_desired_count" {
 }
 
 variable "rds_dev_access_cidrs" {
-  description = "One or more public IPs as /32 (curl -s https://checkip.amazonaws.com) so local Prisma can reach prod RDS—e.g. home and school Wi‑Fi. Empty = RDS stays private (ECS only)."
+  description = "One or more public IPs as /32 (curl -s https://checkip.amazonaws.com) so local Prisma can reach prod RDS—e.g. home and school Wi‑Fi. Empty = RDS stays private (ECS only). Prefer TF_VAR_rds_dev_access_cidrs or rds.auto.tfvars (gitignored) so you do not commit personal IPs."
   type        = list(string)
   default     = []
-  sensitive   = false
+  sensitive   = true
 }

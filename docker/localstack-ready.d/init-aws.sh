@@ -16,8 +16,8 @@ else
   exit 0
 fi
 
-"${AWS[@]}" s3 mb "s3://cardboardforge-assets" 2>/dev/null || true
-"${AWS[@]}" s3 mb "s3://cardboardforge-exports" 2>/dev/null || true
-"${AWS[@]}" sqs create-queue --queue-name cardboardforge-pdf-generation 2>/dev/null || true
+"${AWS[@]}" s3 mb "s3://cardgoose-assets" 2>/dev/null || true
+"${AWS[@]}" s3 mb "s3://cardgoose-exports" 2>/dev/null || true
+"${AWS[@]}" sqs create-queue --queue-name cardgoose-pdf-generation 2>/dev/null || true
 
 echo "LocalStack bootstrap: S3 buckets + SQS queue ready"
