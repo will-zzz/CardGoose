@@ -14,11 +14,11 @@ Planned work (edit this list as you ship):
 
 ## Monorepo layout
 
-| Path       | Description                           |
-| ---------- | ------------------------------------- |
-| `frontend` | Vite + React + Tailwind (dashboard)   |
-| `api`      | Node.js API (Express, Prisma, AWS)    |
-| `worker`   | Python Baker (Playwright rendering)   |
+| Path       | Description                         |
+| ---------- | ----------------------------------- |
+| `frontend` | Vite + React + Tailwind (dashboard) |
+| `api`      | Node.js API (Express, Prisma, AWS)  |
+| `worker`   | Python Baker (Playwright rendering) |
 | `infra`    | Terraform (AWS)                     |
 
 ## Prerequisites
@@ -36,11 +36,11 @@ Planned work (edit this list as you ship):
 
 Pick one path. They differ by **where Postgres and object/queue services run**, not by repo layout.
 
-| Mode            | Frontend | API & worker | Database   | Buckets & queue      |
-| --------------- | -------- | ------------ | ---------- | -------------------- |
-| **Fully local** | Your Mac | Your Mac     | Docker     | LocalStack (emulated) |
-| **Hybrid**      | Your Mac | Your Mac     | AWS RDS    | AWS S3 & SQS         |
-| **Production**  | ECS\*    | ECS          | AWS RDS    | AWS S3 & SQS         |
+| Mode            | Frontend | API & worker | Database | Buckets & queue       |
+| --------------- | -------- | ------------ | -------- | --------------------- |
+| **Fully local** | Your Mac | Your Mac     | Docker   | LocalStack (emulated) |
+| **Hybrid**      | Your Mac | Your Mac     | AWS RDS  | AWS S3 & SQS          |
+| **Production**  | ECS\*    | ECS          | AWS RDS  | AWS S3 & SQS          |
 
 \*The API container can serve the built SPA in production (`NODE_ENV=production`). Until you add a stable URL (ALB, CloudFront, etc.), you may use the task public IP for smoke tests.
 
@@ -139,9 +139,9 @@ pnpm migrate:deploy
 
 ## Environment files
 
-| File | Purpose |
-| ---- | ------- |
-| [`.env.local.example`](.env.local.example) | Template for **local** dev — copy to **`.env.local`** at the repo root. |
+| File                                                 | Purpose                                                                                                     |
+| ---------------------------------------------------- | ----------------------------------------------------------------------------------------------------------- |
+| [`.env.local.example`](.env.local.example)           | Template for **local** dev — copy to **`.env.local`** at the repo root.                                     |
 | [`.env.production.example`](.env.production.example) | Template for **production DB / ops** — copy to **`.env.production`** for Prisma and tooling (never commit). |
 
 The API loads **`.env.local`** when `NODE_ENV` is not `production`. Prisma CLI uses `dotenv -e ../.env.local` or `../.env.production` via the `prisma:deploy` scripts. The Baker worker loads the same **`.env.local`** when run locally (`python-dotenv`; existing environment variables win).
