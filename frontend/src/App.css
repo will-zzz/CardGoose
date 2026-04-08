@@ -1655,8 +1655,17 @@ button.zone-row-body:hover {
   font-weight: 500;
 }
 
-.studio-shell-brand-text {
-  white-space: nowrap;
+.studio-shell-brand--mark-only {
+  gap: 0;
+  line-height: 0;
+  padding: 4px 0;
+}
+
+.studio-shell-header--dash .studio-shell-row {
+  min-height: 56px;
+  padding-left: 14px;
+  padding-right: 20px;
+  align-items: center;
 }
 
 .studio-shell-logo {
@@ -1665,6 +1674,15 @@ button.zone-row-body:hover {
   justify-content: center;
   flex-shrink: 0;
   color: var(--accent);
+}
+
+.brand-logo-mark svg {
+  display: block;
+}
+
+/* Defeat black fills from exports (invisible on dark chrome); parent sets color */
+.brand-logo-mark path {
+  fill: currentColor;
 }
 
 .studio-shell-left {
