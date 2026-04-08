@@ -1,18 +1,18 @@
+<p align="center">
+  <img src=".github/readme-assets/banner.png" alt="CardGoose — board games for Print &amp; Play and Tabletop Simulator" width="100%" />
+</p>
 
+<p align="center">
+  A tool to make board games for <strong>Print &amp; Play</strong> and <a href="https://www.tabletopsimulator.com/">Tabletop Simulator</a>.
+</p>
 
 ---
-
-A tool to make board games for **Print & Play** and [Tabletop Simulator](https://www.tabletopsimulator.com/).
 
 ## About
-
----
 
 Designing board games is hard. It requires **rapid iteration** and the ability to make changes **on-the-fly**. CardGoose makes it easier with data-driven components and custom templates to build your ideas in minutes.
 
 ## Key Features
-
----
 
 - Import data from Google Sheets & refresh for live updates
 - Component layout editor for card design
@@ -22,8 +22,6 @@ Designing board games is hard. It requires **rapid iteration** and the ability t
 - TTS export (coming soon)
 
 # Getting started
-
----
 
 ## Prerequisites
 
