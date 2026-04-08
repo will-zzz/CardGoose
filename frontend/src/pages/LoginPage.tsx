@@ -1,5 +1,6 @@
 import { useState, type FormEvent } from 'react';
 import { Navigate } from 'react-router-dom';
+import { BrandLogo } from '../components/BrandLogo';
 import { useAuth } from '../contexts/useAuth';
 
 export function LoginPage() {
@@ -30,7 +31,9 @@ export function LoginPage() {
 
   return (
     <div className="auth-page">
-      <h1>CardboardForge</h1>
+      <h1 className="auth-page-brand">
+        <BrandLogo heightPx={56} alt="CardGoose" />
+      </h1>
       <p className="muted">MVP test harness — sign in</p>
       <form onSubmit={onSubmit} className="card">
         <div className="tabs">

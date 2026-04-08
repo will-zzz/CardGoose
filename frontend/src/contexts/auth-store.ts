@@ -1,6 +1,6 @@
 import type { AuthUser } from './auth-types';
 
-const STORAGE_KEY = 'cardboardforge_auth';
+const STORAGE_KEY = 'cardgoose_auth';
 
 type Stored = { token: string; user: AuthUser };
 

@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react';
-import { Box, ChevronDown, ChevronRight, Loader2, User } from 'lucide-react';
+import { ChevronDown, ChevronRight, Loader2, User } from 'lucide-react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/useAuth';
 import { useStudioChrome } from '../contexts/StudioChrome';
@@ -13,6 +13,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from './ui/dropdown-menu';
+import { BrandLogo } from './BrandLogo';
 
 function AppMenu({
   label,
@@ -147,9 +148,9 @@ function DashboardBar() {
           onClick={(e) => layoutEditor?.onNavigateHomeClick(e)}
         >
           <span className="studio-shell-logo" aria-hidden>
-            <Box size={20} strokeWidth={2} />
+            <BrandLogo heightPx={20} />
           </span>
-          <span className="studio-shell-brand-text">CardboardForge</span>
+          <span className="studio-shell-brand-text">CardGoose</span>
         </Link>
         <div className="studio-shell-fill" aria-hidden />
         <AccountMenu />
@@ -184,9 +185,10 @@ function ProjectTabsBar() {
             to="/"
             className="studio-shell-brand studio-shell-brand--compact"
             onClick={(e) => onNavigateHomeClick(e)}
+            aria-label="Home"
           >
             <span className="studio-shell-logo" aria-hidden>
-              <Box size={20} strokeWidth={2} />
+              <BrandLogo heightPx={20} />
             </span>
           </Link>
           <span className="studio-shell-project-name">{projectName}</span>
@@ -220,9 +222,9 @@ function ProjectLoadingBar() {
     <header className="studio-shell-header studio-shell-header--project" role="banner">
       <div className="studio-shell-row studio-shell-row--project">
         <div className="studio-shell-left">
-          <Link to="/" className="studio-shell-brand studio-shell-brand--compact">
+          <Link to="/" className="studio-shell-brand studio-shell-brand--compact" aria-label="Home">
             <span className="studio-shell-logo" aria-hidden>
-              <Box size={20} strokeWidth={2} />
+              <BrandLogo heightPx={20} />
             </span>
           </Link>
           <span className="studio-shell-project-name studio-shell-project-name--muted">
@@ -304,7 +306,7 @@ function EditorBar() {
             aria-label="Home"
           >
             <span className="studio-shell-logo" aria-hidden>
-              <Box size={18} strokeWidth={2} />
+              <BrandLogo heightPx={18} />
             </span>
           </Link>
           <ChevronRight size={14} className="editor-bc-sep" aria-hidden />

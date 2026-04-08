@@ -190,6 +190,11 @@ body.layout-editor-open .main.main-wide {
   margin-top: 0;
 }
 
+.auth-page-brand {
+  margin: 0 0 4px;
+  line-height: 0;
+}
+
 .card {
   display: flex;
   flex-direction: column;
@@ -1658,6 +1663,7 @@ button.zone-row-body:hover {
   display: inline-flex;
   align-items: center;
   justify-content: center;
+  flex-shrink: 0;
   color: var(--accent);
 }
 
