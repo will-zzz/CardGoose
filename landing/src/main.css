@@ -1,0 +1,20 @@
+@import 'tailwindcss';
+
+:root {
+  --bg: #0b0b0b;
+  --text: #a1a1aa;
+  --text-h: #fafafa;
+  --border: #2a2a2e;
+  --accent: #10b981;
+  --panel: #161616;
+  font-family: system-ui, 'Segoe UI', Roboto, sans-serif;
+  color-scheme: dark;
+  color: var(--text);
+  background: var(--bg);
+  line-height: 1.5;
+  -webkit-font-smoothing: antialiased;
+}
+
+body {
+  margin: 0;
+}

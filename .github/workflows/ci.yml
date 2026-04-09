@@ -33,6 +33,9 @@ jobs:
       - name: Prettier check
         run: pnpm run format:check
 
+      - name: Build landing site
+        run: pnpm --filter landing build
+
   test-api:
     name: Unit tests (API)
     runs-on: ubuntu-latest

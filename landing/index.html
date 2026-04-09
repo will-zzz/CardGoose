@@ -1,0 +1,119 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta
+      name="description"
+      content="CardGoose helps you design board games for Print & Play and Tabletop Simulator."
+    />
+    <title>CardGoose — Board games for Print & Play</title>
+    <link rel="icon" type="image/svg+xml" href="/cardgoose-favicon.svg" />
+    <link rel="apple-touch-icon" href="/cardgoose-favicon.svg" />
+    <meta property="og:title" content="CardGoose" />
+    <meta
+      property="og:description"
+      content="Design and print tabletop card games with data-driven layouts and live data from Google Sheets."
+    />
+    <meta property="og:type" content="website" />
+    <meta property="og:url" content="https://cardgoose.com/" />
+    <meta property="og:image" content="https://cardgoose.com/cardgoose-favicon.svg" />
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:title" content="CardGoose" />
+    <meta
+      name="twitter:description"
+      content="Design and print tabletop card games with CardGoose."
+    />
+    <meta name="twitter:image" content="https://cardgoose.com/cardgoose-favicon.svg" />
+  </head>
+  <body class="min-h-svh antialiased">
+    <div
+      class="pointer-events-none fixed inset-0 -z-10 bg-[radial-gradient(ellipse_80%_50%_at_50%_-20%,rgba(16,185,129,0.12),transparent)]"
+      aria-hidden="true"
+    ></div>
+    <header class="border-b border-[var(--border)] bg-[var(--bg)]/80 backdrop-blur-sm">
+      <div class="mx-auto flex max-w-5xl items-center justify-between gap-4 px-5 py-4">
+        <a href="/" class="flex items-center gap-3 text-[var(--text-h)] no-underline">
+          <img
+            src="/cardgoose-favicon.svg"
+            alt=""
+            width="40"
+            height="40"
+            class="h-10 w-10 shrink-0"
+          />
+          <span class="text-lg font-semibold tracking-tight">CardGoose</span>
+        </a>
+        <a
+          data-app-link
+          data-path="/login"
+          href="https://app.cardgoose.com/login"
+          class="rounded-lg bg-[var(--accent)] px-4 py-2 text-sm font-medium text-[var(--bg)] no-underline transition-opacity hover:opacity-90"
+        >
+          Open app
+        </a>
+      </div>
+    </header>
+
+    <main>
+      <section class="mx-auto max-w-5xl px-5 pb-20 pt-16 text-center sm:pt-24">
+        <p class="mb-6 text-sm font-medium uppercase tracking-[0.2em] text-[var(--accent)]">
+          Print &amp; Play · Tabletop Simulator
+        </p>
+        <h1
+          class="mb-6 text-4xl font-medium leading-tight tracking-tight text-[var(--text-h)] sm:text-5xl"
+        >
+          Ship card games faster
+        </h1>
+        <p class="mx-auto mb-10 max-w-2xl text-lg text-[var(--text)]">
+          Data-driven components, custom templates, and a layout editor so you can iterate in
+          minutes—not days.
+        </p>
+        <div class="flex flex-wrap items-center justify-center gap-4">
+          <a
+            data-app-link
+            data-path="/login"
+            href="https://app.cardgoose.com/login"
+            class="inline-flex items-center justify-center rounded-lg bg-[var(--accent)] px-6 py-3 text-base font-medium text-[var(--bg)] no-underline transition-opacity hover:opacity-90"
+          >
+            Get started
+          </a>
+          <a
+            href="https://www.tabletopsimulator.com/"
+            class="inline-flex items-center justify-center rounded-lg border border-[var(--border)] bg-[var(--panel)] px-6 py-3 text-base font-medium text-[var(--text-h)] no-underline transition-colors hover:border-[var(--accent)]/50"
+            rel="noopener noreferrer"
+            target="_blank"
+          >
+            Tabletop Simulator
+          </a>
+        </div>
+      </section>
+
+      <section class="border-t border-[var(--border)] bg-[var(--panel)]/40 py-16">
+        <div class="mx-auto grid max-w-5xl gap-10 px-5 sm:grid-cols-3">
+          <div>
+            <h2 class="mb-2 text-lg font-medium text-[var(--text-h)]">Live data</h2>
+            <p class="text-[var(--text)]">
+              Import from Google Sheets and refresh when your data changes.
+            </p>
+          </div>
+          <div>
+            <h2 class="mb-2 text-lg font-medium text-[var(--text-h)]">Layout editor</h2>
+            <p class="text-[var(--text)]">
+              Design card faces with a visual editor and deck preview.
+            </p>
+          </div>
+          <div>
+            <h2 class="mb-2 text-lg font-medium text-[var(--text-h)]">Export</h2>
+            <p class="text-[var(--text)]">Print-ready PDFs and assets for your workflow.</p>
+          </div>
+        </div>
+      </section>
+    </main>
+
+    <footer class="border-t border-[var(--border)] py-8 text-center text-sm text-[var(--text)]">
+      <p>© CardGoose</p>
+    </footer>
+
+    <script type="module" src="/src/main.ts"></script>
+  </body>
+</html>

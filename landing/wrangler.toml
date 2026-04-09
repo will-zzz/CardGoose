@@ -1,0 +1,7 @@
+# Cloudflare Workers static assets — used by Workers Builds (deploy command).
+# Match `name` to your Worker in the dashboard, or rename the Worker on first deploy.
+name = "cardgoose-landing"
+compatibility_date = "2024-09-01"
+
+[assets]
+directory = "./dist"
