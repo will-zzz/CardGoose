@@ -10,8 +10,10 @@ import { projectsRouter } from './routes/projects.js';
 import { assetsRouter } from './routes/assets.js';
 import { exportsRouter } from './routes/exports.js';
 import { rootLogger } from './lib/logger.js';
+import { assertDevProfileIfSet } from './lib/devProfile.js';
+import { ensureDevLocalStackBuckets } from './lib/s3.js';
 
-// Local DATABASE_URL etc.: use `pnpm dev` so dotenv-cli loads ../.env.local before any imports (Prisma reads env at init).
+// Local env: `pnpm dev:api` / `pnpm dev:local` use dotenv-cli to load ../.env.local before imports.
 
 const app = express();
 const port = Number(process.env.PORT) || 3001;
@@ -59,13 +61,21 @@ if (existsSync(publicDir) && process.env.NODE_ENV === 'production') {
   });
 }
 
-app.listen(port, '0.0.0.0', () => {
-  rootLogger.info(
-    {
-      port,
-      nodeEnv: process.env.NODE_ENV ?? 'development',
-      awsEndpoint: process.env.AWS_ENDPOINT_URL ?? '(real AWS)',
-    },
-    'API listening'
-  );
+assertDevProfileIfSet();
+
+void (async () => {
+  await ensureDevLocalStackBuckets();
+  app.listen(port, '0.0.0.0', () => {
+    rootLogger.info(
+      {
+        port,
+        nodeEnv: process.env.NODE_ENV ?? 'development',
+        awsEndpoint: process.env.AWS_ENDPOINT_URL ?? '(real AWS)',
+      },
+      'API listening'
+    );
+  });
+})().catch((err) => {
+  rootLogger.error(err);
+  process.exit(1);
 });

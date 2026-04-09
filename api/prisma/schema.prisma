@@ -56,7 +56,7 @@ model CardGroup {
   @@index([projectId, sortOrder])
 }
 
-/// react-konva stage JSON + metadata (hybrid schema from design doc).
+/// react-konva stage JSON + metadata.
 model Layout {
   id          String   @id @default(uuid()) @db.Uuid
   projectId   String   @map("project_id") @db.Uuid

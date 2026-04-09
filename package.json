@@ -11,9 +11,13 @@
     "migrate:deploy": "pnpm --filter api prisma:deploy",
     "migrate:deploy:prod": "pnpm --filter api prisma:deploy:prod",
     "docker:up": "docker compose up -d postgres localstack",
-    "docker:down": "docker compose down"
+    "docker:up:local": "docker compose up -d postgres localstack",
+    "docker:down": "docker compose down",
+    "dev:local": "docker compose up -d postgres localstack && concurrently -n api,frontend -c blue,green \"pnpm dev:api\" \"pnpm dev:frontend\"",
+    "dev:local:worker": "docker compose up -d postgres localstack && concurrently -n api,frontend,worker -c blue,green,magenta \"pnpm dev:api\" \"pnpm dev:frontend\" \"sh -c 'cd worker && PYTHONPATH=src python3 -m baker.main'\""
   },
   "devDependencies": {
+    "concurrently": "^9.2.1",
     "eslint": "^9.17.0",
     "prettier": "^3.4.2",
     "typescript": "^5.7.2"
