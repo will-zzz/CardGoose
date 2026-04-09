@@ -1,10 +1,13 @@
 import {
+  CreateBucketCommand,
   GetObjectCommand,
+  HeadBucketCommand,
   ListObjectsV2Command,
   PutObjectCommand,
   S3Client,
 } from '@aws-sdk/client-s3';
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
+import { rootLogger } from './logger.js';
 
 function endpointConfig(): { endpoint?: string; forcePathStyle?: boolean } {
   const url = process.env.AWS_ENDPOINT_URL;
@@ -36,6 +39,29 @@ export function getExportsBucket(): string {
   const b = process.env.S3_BUCKET_EXPORTS;
   if (!b) throw new Error('S3_BUCKET_EXPORTS is not set');
   return b;
+}
+
+/** After Docker/LocalStack restarts, buckets may be missing; create them in dev only. */
+export async function ensureDevLocalStackBuckets(): Promise<void> {
+  const endpoint = process.env.AWS_ENDPOINT_URL ?? '';
+  if (process.env.NODE_ENV === 'production') return;
+  if (!endpoint.includes(':4566')) return;
+
+  const buckets = [getAssetsBucket(), getExportsBucket()];
+  for (const Bucket of buckets) {
+    try {
+      await s3Client.send(new HeadBucketCommand({ Bucket }));
+    } catch {
+      try {
+        await s3Client.send(new CreateBucketCommand({ Bucket }));
+        rootLogger.info({ Bucket }, 'Created missing LocalStack S3 bucket');
+      } catch (err) {
+        const name = err instanceof Error ? err.name : '';
+        if (name === 'BucketAlreadyOwnedByYou' || name === 'BucketAlreadyExists') continue;
+        throw err;
+      }
+    }
+  }
 }
 
 export async function putObject(

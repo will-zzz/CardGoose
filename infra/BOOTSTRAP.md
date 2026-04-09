@@ -126,7 +126,7 @@ Use Docker Compose for **PostgreSQL** and **LocalStack** (S3/SQS emulation):
 pnpm docker:up
 ```
 
-Copy `.env.local.example` to `.env.local` and point `AWS_ENDPOINT_URL` at LocalStack when testing the API/worker against emulated services.
+Copy `.env.local.example` to `.env.local` when testing the API/worker against Docker Postgres and LocalStack (no real AWS).
 
 ## Reference
 
