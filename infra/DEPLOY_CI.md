@@ -32,6 +32,7 @@ Create these in **Settings → Secrets and variables → Actions** (repository s
 | `ECS_CLUSTER_NAME` | `terraform output -raw ecs_cluster_name` |
 | `ECS_API_SERVICE_NAME` | `terraform output -raw ecs_api_service_name` |
 | `ECS_WORKER_SERVICE_NAME` | `terraform output -raw ecs_worker_service_name` |
+| `VITE_GOOGLE_CLIENT_ID` | OAuth 2.0 **Web** client ID from [Google Cloud Console](https://console.cloud.google.com/apis/credentials) (same value as local `frontend/.env.local`). Baked into the SPA when the API image is built. Add your production site URL under **Authorized JavaScript origins**. |
 
 Use a dedicated IAM user with least privilege: ECR push to both repos, `ecs:UpdateService` / `DescribeServices` on the cluster services.
 
