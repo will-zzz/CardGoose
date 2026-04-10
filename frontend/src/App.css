@@ -1727,23 +1727,6 @@ button.zone-row-body:hover {
   max-width: 160px;
 }
 
-.card-group-data-pill {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  padding: 4px 10px;
-  border-radius: 999px;
-  border: 1px solid rgba(255, 255, 255, 0.08);
-  background: rgba(255, 255, 255, 0.03);
-  color: #d4d4d8;
-  font-size: 12px;
-  font-weight: 500;
-}
-
-.card-group-data-pill--muted {
-  color: rgba(161, 161, 170, 0.9);
-}
-
 .card-group-synced {
   font-size: 11px;
   color: rgba(161, 161, 170, 0.85);
@@ -1799,6 +1782,17 @@ button.zone-row-body:hover {
   padding: 10px 12px;
   border-bottom: 1px solid rgba(255, 255, 255, 0.06);
   background: rgba(0, 0, 0, 0.2);
+}
+
+.card-group-url-drawer--popover {
+  border-bottom: none;
+  background: transparent;
+  padding: 8px 10px 10px;
+}
+
+.card-group-menu--data-source {
+  min-width: min(100vw - 32px, 360px);
+  max-width: min(100vw - 24px, 420px);
 }
 
 .card-group-url-drawer-label {
@@ -2855,4 +2849,74 @@ button.zone-tool--icon {
 
 button.zone-tool--icon:hover:not(:disabled) {
   color: var(--accent);
+}
+
+/* —— Global toasts (bottom of viewport) —— */
+.toast-viewport {
+  position: fixed;
+  bottom: max(16px, env(safe-area-inset-bottom, 0px));
+  left: 16px;
+  right: 16px;
+  z-index: 10000;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  pointer-events: none;
+}
+
+.toast {
+  pointer-events: auto;
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  width: 100%;
+  max-width: 420px;
+  padding: 12px 12px 12px 14px;
+  border-radius: 10px;
+  font-size: 14px;
+  line-height: 1.4;
+  box-shadow: var(--shadow);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  background: rgba(22, 22, 26, 0.97);
+  backdrop-filter: blur(10px);
+  color: var(--text-h);
+}
+
+.toast--error {
+  border-color: rgba(248, 113, 113, 0.45);
+  background: rgba(69, 10, 10, 0.92);
+  color: #fecaca;
+}
+
+.toast--info {
+  border-color: var(--accent-border);
+  background: rgba(16, 24, 22, 0.96);
+  color: #d1fae5;
+}
+
+.toast-message {
+  flex: 1;
+  min-width: 0;
+  word-break: break-word;
+}
+
+.toast-dismiss {
+  flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  margin: -4px -4px -4px 0;
+  padding: 4px;
+  border: none;
+  border-radius: 6px;
+  background: transparent;
+  color: inherit;
+  opacity: 0.65;
+  cursor: pointer;
+}
+
+.toast-dismiss:hover {
+  opacity: 1;
+  background: rgba(255, 255, 255, 0.08);
 }

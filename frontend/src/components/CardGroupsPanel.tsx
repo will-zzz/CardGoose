@@ -110,7 +110,8 @@ export function CardGroupsPanel(props: {
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
   const [editingTitleId, setEditingTitleId] = useState<string | null>(null);
-  const [urlEditorGroupId, setUrlEditorGroupId] = useState<string | null>(null);
+  /** Which card group has the data source URL popover open (same pattern as layout dropdown). */
+  const [dataSourceMenuGroupId, setDataSourceMenuGroupId] = useState<string | null>(null);
   const [urlDraft, setUrlDraft] = useState('');
   /** Group ids whose gallery is collapsed (default: expanded) */
   const [collapsedGalleryIds, setCollapsedGalleryIds] = useState<Set<string>>(() => new Set());
@@ -194,14 +195,14 @@ export function CardGroupsPanel(props: {
           token,
         });
         setGroups((prev) => prev.filter((g) => g.id !== groupId));
-        if (urlEditorGroupId === groupId) setUrlEditorGroupId(null);
+        if (dataSourceMenuGroupId === groupId) setDataSourceMenuGroupId(null);
       } catch (e) {
         onError(e instanceof Error ? e.message : 'Delete failed');
       } finally {
         onBusy(false);
       }
     },
-    [token, projectId, onBusy, onError, urlEditorGroupId]
+    [token, projectId, onBusy, onError, dataSourceMenuGroupId]
   );
 
   const duplicateGroup = useCallback(
@@ -244,19 +245,19 @@ export function CardGroupsPanel(props: {
     [token, projectId, onBusy, onError]
   );
 
-  const openUrlEditor = useCallback((g: CardGroupDto) => {
-    setUrlEditorGroupId(g.id);
-    setUrlDraft(g.csvSourceUrl ?? '');
-  }, []);
-
-  const applyUrlEditor = useCallback(
+  const saveDataSourceUrl = useCallback(
     async (groupId: string) => {
       const trimmed = urlDraft.trim();
       await updateGroup(groupId, { csvSourceUrl: trimmed || null });
-      setUrlEditorGroupId(null);
+      setDataSourceMenuGroupId(null);
     },
     [urlDraft, updateGroup]
   );
+
+  const cancelDataSourceUrl = useCallback(() => {
+    setDataSourceMenuGroupId(null);
+    void loadGroups();
+  }, [loadGroups]);
 
   const toggleGallery = useCallback((groupId: string) => {
     setCollapsedGalleryIds((prev) => {
@@ -433,13 +434,88 @@ export function CardGroupsPanel(props: {
                     </DropdownMenuContent>
                   </DropdownMenu>
 
-                  <span
-                    className={`card-group-data-pill${!g.csvSourceUrl ? ' card-group-data-pill--muted' : ''}`}
-                    title={g.csvSourceUrl ?? undefined}
+                  <DropdownMenu
+                    open={dataSourceMenuGroupId === g.id}
+                    onOpenChange={(open) => {
+                      if (open) {
+                        setDataSourceMenuGroupId(g.id);
+                        setUrlDraft(g.csvSourceUrl ?? '');
+                      } else {
+                        setDataSourceMenuGroupId((prev) => (prev === g.id ? null : prev));
+                      }
+                    }}
                   >
-                    <FileSpreadsheet size={14} strokeWidth={2} aria-hidden />
-                    <span>{dataLabel}</span>
-                  </span>
+                    <DropdownMenuTrigger
+                      className={`card-group-meta-chip${!g.csvSourceUrl ? ' card-group-meta-chip--muted' : ''}`}
+                      disabled={busy}
+                      title={g.csvSourceUrl ?? 'Set data source (published CSV URL)'}
+                    >
+                      <FileSpreadsheet size={14} strokeWidth={2} aria-hidden />
+                      <span className="card-group-meta-chip-text">{dataLabel}</span>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent
+                      align="start"
+                      className="card-group-menu card-group-menu--data-source"
+                      onCloseAutoFocus={(e) => e.preventDefault()}
+                    >
+                      <div
+                        className="card-group-url-drawer card-group-url-drawer--popover"
+                        onPointerDown={(e) => e.stopPropagation()}
+                      >
+                        <label className="card-group-url-drawer-label">
+                          Published CSV URL (https)
+                          <Input
+                            type="url"
+                            className="card-group-url-drawer-input"
+                            placeholder="https://docs.google.com/.../export?format=csv&..."
+                            value={urlDraft}
+                            onChange={(e) => setUrlDraft(e.target.value)}
+                            disabled={busy}
+                            autoComplete="off"
+                            onKeyDown={(e) => {
+                              if (e.key === 'Escape') {
+                                e.stopPropagation();
+                                cancelDataSourceUrl();
+                              }
+                            }}
+                          />
+                        </label>
+                        {projectCsvSourceUrl ? (
+                          <button
+                            type="button"
+                            className="card-group-url-drawer-shortcut"
+                            disabled={busy}
+                            onClick={() => {
+                              void (async () => {
+                                await updateGroup(g.id, { csvSourceUrl: projectCsvSourceUrl });
+                                setDataSourceMenuGroupId(null);
+                              })();
+                            }}
+                          >
+                            Use project Data tab URL
+                          </button>
+                        ) : null}
+                        <div className="card-group-url-drawer-actions">
+                          <button
+                            type="button"
+                            className="card-group-url-drawer-save"
+                            disabled={busy}
+                            onClick={() => void saveDataSourceUrl(g.id)}
+                          >
+                            Save
+                          </button>
+                          <button
+                            type="button"
+                            className="card-group-url-drawer-cancel"
+                            disabled={busy}
+                            onClick={() => cancelDataSourceUrl()}
+                          >
+                            Cancel
+                          </button>
+                        </div>
+                      </div>
+                    </DropdownMenuContent>
+                  </DropdownMenu>
 
                   <div className="card-group-header-actions">
                     {ready && g.updatedAt ? (
@@ -472,13 +548,6 @@ export function CardGroupsPanel(props: {
                         >
                           Refresh data
                         </DropdownMenuItem>
-                        <DropdownMenuItem
-                          onSelect={() => {
-                            setTimeout(() => openUrlEditor(g), 0);
-                          }}
-                        >
-                          Edit data source / URL
-                        </DropdownMenuItem>
                         <DropdownMenuItem onSelect={() => void duplicateGroup(g.id)}>
                           Duplicate group
                         </DropdownMenuItem>
@@ -494,55 +563,6 @@ export function CardGroupsPanel(props: {
                   </div>
                 </div>
               </header>
-
-              {urlEditorGroupId === g.id && (
-                <div className="card-group-url-drawer">
-                  <label className="card-group-url-drawer-label">
-                    Published CSV URL (https)
-                    <Input
-                      type="url"
-                      className="card-group-url-drawer-input"
-                      placeholder="https://docs.google.com/.../export?format=csv&..."
-                      value={urlDraft}
-                      onChange={(e) => setUrlDraft(e.target.value)}
-                    />
-                  </label>
-                  {projectCsvSourceUrl ? (
-                    <button
-                      type="button"
-                      className="card-group-url-drawer-shortcut"
-                      disabled={busy}
-                      onClick={() => {
-                        setUrlDraft(projectCsvSourceUrl);
-                        void updateGroup(g.id, { csvSourceUrl: projectCsvSourceUrl });
-                      }}
-                    >
-                      Use project Data tab URL
-                    </button>
-                  ) : null}
-                  <div className="card-group-url-drawer-actions">
-                    <button
-                      type="button"
-                      className="card-group-url-drawer-save"
-                      disabled={busy}
-                      onClick={() => void applyUrlEditor(g.id)}
-                    >
-                      Save &amp; fetch
-                    </button>
-                    <button
-                      type="button"
-                      className="card-group-url-drawer-cancel"
-                      disabled={busy}
-                      onClick={() => {
-                        setUrlEditorGroupId(null);
-                        void loadGroups();
-                      }}
-                    >
-                      Cancel
-                    </button>
-                  </div>
-                </div>
-              )}
 
               <div
                 id={galleryPanelId}

@@ -4,6 +4,7 @@ import { Loader2 } from 'lucide-react';
 import { BrandLogo } from '../components/BrandLogo';
 import { loadGsiScript } from '../lib/loadGsiScript';
 import { useAuth } from '../contexts/useAuth';
+import { useToast } from '../contexts/useToast';
 
 function GoogleGlyph({ className }: { className?: string }) {
   return (
@@ -35,14 +36,13 @@ function shouldIgnoreGoogleUiError(code: string): boolean {
 
 export function LoginPage() {
   const { user, login, register, loginWithGoogle } = useAuth();
+  const { showError } = useToast();
   const [mode, setMode] = useState<'login' | 'register'>('login');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
-  const [error, setError] = useState<string | null>(null);
   const [info, setInfo] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [googleBusy, setGoogleBusy] = useState(false);
-  const errorId = useId();
   const infoId = useId();
 
   if (user) {
@@ -50,7 +50,6 @@ export function LoginPage() {
   }
 
   function clearMessages() {
-    setError(null);
     setInfo(null);
   }
 
@@ -62,7 +61,7 @@ export function LoginPage() {
       if (mode === 'login') await login(email, password);
       else await register(email, password);
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Request failed');
+      showError(err instanceof Error ? err.message : 'Request failed');
     } finally {
       setBusy(false);
     }
@@ -72,7 +71,7 @@ export function LoginPage() {
     clearMessages();
     const cid = import.meta.env.VITE_GOOGLE_CLIENT_ID?.trim();
     if (!cid) {
-      setError(
+      showError(
         'Google sign-in is not configured. Set VITE_GOOGLE_CLIENT_ID in your environment (OAuth 2.0 Web client ID).'
       );
       return;
@@ -93,7 +92,7 @@ export function LoginPage() {
             try {
               if (tokenResponse.error) {
                 if (!shouldIgnoreGoogleUiError(tokenResponse.error)) {
-                  setError(
+                  showError(
                     tokenResponse.error_description ?? tokenResponse.error ?? 'Google sign-in failed'
                   );
                 }
@@ -102,7 +101,7 @@ export function LoginPage() {
               if (!tokenResponse.access_token) return;
               await loginWithGoogle(tokenResponse.access_token);
             } catch (err) {
-              setError(err instanceof Error ? err.message : 'Google sign-in failed');
+              showError(err instanceof Error ? err.message : 'Google sign-in failed');
             } finally {
               setGoogleBusy(false);
             }
@@ -112,7 +111,7 @@ export function LoginPage() {
       client.requestAccessToken({ prompt: '' });
     } catch (err) {
       setGoogleBusy(false);
-      setError(err instanceof Error ? err.message : 'Could not start Google sign-in');
+      showError(err instanceof Error ? err.message : 'Could not start Google sign-in');
     }
   }
 
@@ -167,11 +166,6 @@ export function LoginPage() {
               {info}
             </p>
           )}
-          {error && (
-            <p id={errorId} className="auth-banner auth-banner--error" role="alert">
-              {error}
-            </p>
-          )}
 
           <label className="auth-field">
             <span className="auth-label">Email</span>
@@ -181,14 +175,12 @@ export function LoginPage() {
               value={email}
               onChange={(e) => {
                 setEmail(e.target.value);
-                if (error) setError(null);
                 if (info) setInfo(null);
               }}
               autoComplete="email"
               inputMode="email"
               required
-              aria-invalid={error ? true : undefined}
-              aria-describedby={error ? errorId : info ? infoId : undefined}
+              aria-describedby={info ? infoId : undefined}
             />
           </label>
 
@@ -214,7 +206,6 @@ export function LoginPage() {
               value={password}
               onChange={(e) => {
                 setPassword(e.target.value);
-                if (error) setError(null);
                 if (info) setInfo(null);
               }}
               autoComplete={mode === 'login' ? 'current-password' : 'new-password'}
