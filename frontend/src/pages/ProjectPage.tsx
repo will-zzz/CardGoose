@@ -685,7 +685,6 @@ export function ProjectPage() {
             assetUrls={assetUrls}
             projectCsvSourceUrl={project?.csvSourceUrl ?? null}
             busy={busy}
-            onBusy={setBusy}
             onError={(msg) => msg && showError(msg)}
             onOpenLayoutInEditor={openLayoutInEditor}
           />

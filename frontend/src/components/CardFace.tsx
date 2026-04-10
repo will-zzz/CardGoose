@@ -1,4 +1,4 @@
-import type { Ref } from 'react';
+import { memo, type Ref } from 'react';
 import type { Layer as KonvaLayer } from 'konva/lib/Layer';
 import { Group as KonvaGroup, Image as KonvaImage, Layer, Rect, Stage, Text } from 'react-konva';
 import type { LayoutElement, LayoutStateV2 } from '../types/layout';
@@ -95,20 +95,32 @@ function CardNode({
   return <ImageEl el={node} assetUrls={assetUrls} />;
 }
 
-export function CardFace({
-  state,
-  row,
-  assetUrls,
-  pixelWidth,
-  layerRef,
-}: {
+function rowDataEqual(a: Record<string, string>, b: Record<string, string>): boolean {
+  if (a === b) return true;
+  const ak = Object.keys(a);
+  if (ak.length !== Object.keys(b).length) return false;
+  for (const k of ak) {
+    if (a[k] !== b[k]) return false;
+  }
+  return true;
+}
+
+type CardFaceProps = {
   state: LayoutStateV2;
   row: Record<string, string>;
   assetUrls: Record<string, string>;
   pixelWidth: number;
   /** For headless export: observe draw completion */
   layerRef?: Ref<KonvaLayer>;
-}) {
+};
+
+function CardFaceInner({
+  state,
+  row,
+  assetUrls,
+  pixelWidth,
+  layerRef,
+}: CardFaceProps) {
   const scale = pixelWidth / state.width;
   const pixelHeight = state.height * scale;
   const bg = state.background ?? '#1e1e24';
@@ -126,3 +138,14 @@ export function CardFace({
     </Stage>
   );
 }
+
+export const CardFace = memo(CardFaceInner, (prev, next) => {
+  return (
+    prev.pixelWidth === next.pixelWidth &&
+    prev.state === next.state &&
+    prev.layerRef === next.layerRef &&
+    prev.assetUrls === next.assetUrls &&
+    rowDataEqual(prev.row, next.row)
+  );
+});
+CardFace.displayName = 'CardFace';
