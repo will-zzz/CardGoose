@@ -28,23 +28,6 @@ function GoogleGlyph({ className }: { className?: string }) {
   );
 }
 
-/** Apple mark (Font Awesome–style path); viewBox matches path coordinates. */
-function AppleGlyph({ className }: { className?: string }) {
-  return (
-    <svg
-      className={className}
-      viewBox="0 0 384 512"
-      aria-hidden
-      preserveAspectRatio="xMidYMid meet"
-    >
-      <path
-        fill="currentColor"
-        d="M318.7 268.7c-.2-36.7 16.4-64.4 50-84.8-18.8-26.9-47.2-41.7-84.7-44.6-35.5-2.8-74.3 20.7-88.5 20.7-15 0-49.4-19.7-76.4-19.7C63.3 141.2 4 184.8 4 273.5q0 39.1 14.4 81.2c12.8 36.7 59 126.7 107.2 125.2 25.6-.7 44-16.4 81.2-16.4 38.5 0 49.8 16.4 81.2 16.4 48.3-.8 89.1-68.1 101.8-104.8-57.4-26.6-86.7-67.2-86.5-121.1zm-39.9-249.3c21.4-25.9 35.8-61.9 31.8-98-33.5 2.1-74 22.4-98 50-19.8 22.2-37.2 58.2-32.6 97.5 35.1 2.1 71.2-17.9 98.8-49.5z"
-      />
-    </svg>
-  );
-}
-
 function shouldIgnoreGoogleUiError(code: string): boolean {
   const c = code.toLowerCase();
   return c.includes('popup') || c.includes('cancel') || c === 'access_denied';
@@ -133,11 +116,6 @@ export function LoginPage() {
     }
   }
 
-  function onApplePlaceholder() {
-    clearMessages();
-    setInfo('Apple sign-in is not enabled for this deployment yet. Use email and password or Google.');
-  }
-
   const heading = mode === 'login' ? 'Welcome back' : 'Create your account';
   const sub =
     mode === 'login'
@@ -169,15 +147,6 @@ export function LoginPage() {
               <GoogleGlyph className="auth-social-icon" />
             )}
             <span>{googleBusy ? 'Connecting…' : 'Continue with Google'}</span>
-          </button>
-          <button
-            type="button"
-            className="auth-social-btn auth-social-btn--apple"
-            onClick={onApplePlaceholder}
-            disabled={busy || googleBusy}
-          >
-            <AppleGlyph className="auth-social-icon auth-social-icon--apple" />
-            <span>Continue with Apple</span>
           </button>
         </div>
 

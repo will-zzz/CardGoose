@@ -37,7 +37,9 @@ authRouter.post('/register', async (req, res) => {
   const existing = await prisma.user.findUnique({ where: { username: email } });
   if (existing) {
     if (!existing.passwordHash) {
-      res.status(409).json({ error: 'An account with this email already exists. Sign in with Google.' });
+      res.status(409).json({
+        error: 'An account with this email already exists. Sign in with Google.',
+      });
       return;
     }
     res.status(409).json({ error: 'An account with this email already exists' });
