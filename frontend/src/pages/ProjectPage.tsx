@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState, type FormEvent } fro
 import { useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import { apiBase, apiJson } from '../lib/api';
 import { useAuth } from '../contexts/useAuth';
+import { useToast } from '../contexts/useToast';
 import { parseCsvText } from '../lib/csv';
 import { CardGroupsPanel } from '../components/CardGroupsPanel';
 import { LayoutsListPanel } from '../components/LayoutsListPanel';
@@ -38,6 +39,7 @@ export function ProjectPage() {
   const [searchParams, setSearchParams] = useSearchParams();
   const { setLayoutEditorChrome, setProjectViewNav } = useStudioChrome();
   const { token } = useAuth();
+  const { showError } = useToast();
   const [tab, setTab] = useState<ProjectTab>('cards');
   const layoutEditorRef = useRef<LayoutEditorHandle>(null);
   /** Refresh exports list while a queued PDF may still be processing */
@@ -56,7 +58,6 @@ export function ProjectPage() {
   const [file, setFile] = useState<File | null>(null);
   const [csvFile, setCsvFile] = useState<File | null>(null);
   const [csvUrlDraft, setCsvUrlDraft] = useState('');
-  const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   /** Pipeline tab: PDF export bypasses SQS and can take a while */
   const [exportPdfLoading, setExportPdfLoading] = useState(false);
@@ -118,7 +119,6 @@ export function ProjectPage() {
 
   const loadCore = useCallback(async () => {
     if (!token || !id) return;
-    setError(null);
     const [proj, lays] = await Promise.all([
       apiJson<{ project: ProjectDetail }>(`/api/projects/${id}`, { token }),
       apiJson<{ layouts: LayoutFull[] }>(`/api/projects/${id}/layouts`, { token }),
@@ -146,8 +146,8 @@ export function ProjectPage() {
   }, [token, id, loadPipeline, loadCardGroups]);
 
   useEffect(() => {
-    void loadCore().catch((err) => setError(err instanceof Error ? err.message : 'Load failed'));
-  }, [loadCore]);
+    void loadCore().catch((err) => showError(err instanceof Error ? err.message : 'Load failed'));
+  }, [loadCore, showError]);
 
   useEffect(() => {
     if (tab === 'layout') {
@@ -160,7 +160,6 @@ export function ProjectPage() {
   const saveLayout = useCallback(async (): Promise<boolean> => {
     if (!token || !id || !activeLayoutId) return false;
     setBusy(true);
-    setError(null);
     try {
       const { layout } = await apiJson<{ layout: LayoutFull }>(
         `/api/projects/${id}/layouts/${activeLayoutId}`,
@@ -187,12 +186,12 @@ export function ProjectPage() {
       setLastSavedAt(new Date());
       return true;
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Save failed');
+      showError(err instanceof Error ? err.message : 'Save failed');
       return false;
     } finally {
       setBusy(false);
     }
-  }, [token, id, activeLayoutId, layoutName, editorState, project]);
+  }, [token, id, activeLayoutId, layoutName, editorState, project, showError]);
 
   const layoutIsDirty = useMemo(() => {
     if (!savedBaseline) return false;
@@ -269,7 +268,6 @@ export function ProjectPage() {
     async (layoutName: string) => {
       if (!token || !id) return;
       setBusy(true);
-      setError(null);
       try {
         const { layout } = await apiJson<{ layout: LayoutFull }>(`/api/projects/${id}/layouts`, {
           method: 'POST',
@@ -287,13 +285,13 @@ export function ProjectPage() {
           });
         }
       } catch (err) {
-        setError(err instanceof Error ? err.message : 'Create failed');
+        showError(err instanceof Error ? err.message : 'Create failed');
         throw err;
       } finally {
         setBusy(false);
       }
     },
-    [token, id, project]
+    [token, id, project, showError]
   );
 
   const deleteLayout = useCallback(
@@ -307,7 +305,6 @@ export function ProjectPage() {
         return;
       }
       setBusy(true);
-      setError(null);
       try {
         await apiJson(`/api/projects/${id}/layouts/${layoutId}`, { method: 'DELETE', token });
         const nextList = layoutsFull.filter((l) => l.id !== layoutId);
@@ -349,12 +346,12 @@ export function ProjectPage() {
           }
         }
       } catch (err) {
-        setError(err instanceof Error ? err.message : 'Delete failed');
+        showError(err instanceof Error ? err.message : 'Delete failed');
       } finally {
         setBusy(false);
       }
     },
-    [token, id, layoutsFull, activeLayoutId, project]
+    [token, id, layoutsFull, activeLayoutId, project, showError]
   );
 
   useEffect(() => {
@@ -410,7 +407,6 @@ export function ProjectPage() {
     const name = window.prompt('New layout name', suggested);
     if (!name?.trim()) return;
     setBusy(true);
-    setError(null);
     try {
       const { layout } = await apiJson<{ layout: LayoutFull }>(`/api/projects/${id}/layouts`, {
         method: 'POST',
@@ -434,11 +430,11 @@ export function ProjectPage() {
         });
       }
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Save as failed');
+      showError(err instanceof Error ? err.message : 'Save as failed');
     } finally {
       setBusy(false);
     }
-  }, [token, id, layoutName, editorState, project]);
+  }, [token, id, layoutName, editorState, project, showError]);
 
   const exitLayoutEditor = useCallback(() => {
     if (layoutIsDirty) {
@@ -461,7 +457,6 @@ export function ProjectPage() {
     e.preventDefault();
     if (!token || !id || !csvFile) return;
     setBusy(true);
-    setError(null);
     try {
       const text = await csvFile.text();
       const parsed = parseCsvText(text);
@@ -486,7 +481,7 @@ export function ProjectPage() {
       }
       setCsvFile(null);
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Import failed');
+      showError(err instanceof Error ? err.message : 'Import failed');
     } finally {
       setBusy(false);
     }
@@ -496,7 +491,6 @@ export function ProjectPage() {
     e.preventDefault();
     if (!token || !id || !file) return;
     setBusy(true);
-    setError(null);
     try {
       const fd = new FormData();
       fd.append('file', file);
@@ -514,7 +508,7 @@ export function ProjectPage() {
       setArtKey('');
       await loadPipeline();
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Upload failed');
+      showError(err instanceof Error ? err.message : 'Upload failed');
     } finally {
       setBusy(false);
     }
@@ -523,7 +517,6 @@ export function ProjectPage() {
   async function saveCsvLink() {
     if (!token || !id) return;
     setBusy(true);
-    setError(null);
     try {
       const trimmed = csvUrlDraft.trim();
       const { csvSourceUrl } = await apiJson<{ csvSourceUrl: string | null }>(
@@ -537,7 +530,7 @@ export function ProjectPage() {
       if (project) setProject({ ...project, csvSourceUrl });
       setCsvUrlDraft(csvSourceUrl ?? '');
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Save link failed');
+      showError(err instanceof Error ? err.message : 'Save link failed');
     } finally {
       setBusy(false);
     }
@@ -546,7 +539,6 @@ export function ProjectPage() {
   async function refreshCsvFromUrl() {
     if (!token || !id) return;
     setBusy(true);
-    setError(null);
     try {
       const res = await apiJson<{ csvData: CsvData; csvSourceUrl: string }>(
         `/api/projects/${id}/csv/refresh`,
@@ -567,7 +559,7 @@ export function ProjectPage() {
       }
       setCsvUrlDraft(res.csvSourceUrl);
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Refresh failed');
+      showError(err instanceof Error ? err.message : 'Refresh failed');
     } finally {
       setBusy(false);
     }
@@ -577,7 +569,6 @@ export function ProjectPage() {
     if (!token || !id) return;
     setExportPdfLoading(true);
     setExportPdfStatus(null);
-    setError(null);
     try {
       await apiJson<{ queued: boolean; projectId: string; timestamp: string }>(
         `/api/projects/${id}/export-pdf`,
@@ -602,11 +593,11 @@ export function ProjectPage() {
       }, 8000);
       window.setTimeout(() => setExportPdfStatus(null), 12_000);
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Export failed');
+      showError(err instanceof Error ? err.message : 'Export failed');
     } finally {
       setExportPdfLoading(false);
     }
-  }, [token, id, loadPipeline, exportPdfDpi]);
+  }, [token, id, loadPipeline, exportPdfDpi, showError]);
 
   useEffect(() => {
     return () => {
@@ -685,8 +676,6 @@ export function ProjectPage() {
     <div
       className={`page project-dashboard${tab === 'layout' ? ' project-dashboard--layout-tab' : ''}`}
     >
-      {error && <p className="error">{error}</p>}
-
       {tab === 'cards' && (
         <section className="section cards-tab-section">
           <CardGroupsPanel
@@ -696,8 +685,7 @@ export function ProjectPage() {
             assetUrls={assetUrls}
             projectCsvSourceUrl={project?.csvSourceUrl ?? null}
             busy={busy}
-            onBusy={setBusy}
-            onError={setError}
+            onError={(msg) => msg && showError(msg)}
             onOpenLayoutInEditor={openLayoutInEditor}
           />
         </section>
@@ -712,7 +700,7 @@ export function ProjectPage() {
               lastUpdated: l.lastUpdated,
             }))}
             busy={busy}
-            onError={setError}
+            onError={(msg) => msg && showError(msg)}
             onOpenLayout={openLayoutInEditor}
             onCreateLayout={createLayoutFromList}
             onDeleteLayout={deleteLayout}

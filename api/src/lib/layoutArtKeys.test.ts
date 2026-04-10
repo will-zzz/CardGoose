@@ -33,4 +33,30 @@ describe('collectArtKeysFromLayoutState', () => {
     });
     expect(keys).toEqual(['bg']);
   });
+
+  it('reads v1 elements array', () => {
+    const keys = collectArtKeysFromLayoutState({
+      elements: [{ type: 'image', id: 'i', x: 0, y: 0, width: 1, height: 1, artKey: 'e1' }],
+    });
+    expect(keys).toEqual(['e1']);
+  });
+
+  it('returns empty for non-object state', () => {
+    expect(collectArtKeysFromLayoutState(null)).toEqual([]);
+    expect(collectArtKeysFromLayoutState('x')).toEqual([]);
+  });
+
+  it('ignores empty artKey', () => {
+    const keys = collectArtKeysFromLayoutState({
+      root: [{ type: 'image', id: 'i', x: 0, y: 0, width: 1, height: 1, artKey: '  ' }],
+    });
+    expect(keys).toEqual([]);
+  });
+
+  it('trims art key', () => {
+    const keys = collectArtKeysFromLayoutState({
+      root: [{ type: 'image', id: 'i', x: 0, y: 0, width: 1, height: 1, artKey: '  art  ' }],
+    });
+    expect(keys).toEqual(['art']);
+  });
 });
