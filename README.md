@@ -38,11 +38,11 @@ Designing board games is hard. It requires **rapid iteration** and the ability t
 
 Develop against **Docker Postgres** and **LocalStack** (S3/SQS). No real AWS calls. When you are ready, **push to `main`** and [GitHub Actions](.github/workflows/ci.yml) builds and deploys to ECS.
 
-| Piece | Where it runs locally |
-| ----- | --------------------- |
-| Frontend + API + worker | Your machine |
-| Database | Docker Postgres (`localhost:5433`) |
-| S3 / SQS | LocalStack (`localhost:4566`) |
+| Piece                   | Where it runs locally              |
+| ----------------------- | ---------------------------------- |
+| Frontend + API + worker | Your machine                       |
+| Database                | Docker Postgres (`localhost:5433`) |
+| S3 / SQS                | LocalStack (`localhost:4566`)      |
 
 The API container can serve the built SPA in production (`NODE_ENV=production`). Until you add a stable URL (ALB, CloudFront, etc.), you may use the task public IP for smoke tests.
 
@@ -115,10 +115,10 @@ ECS tasks do **not** read `.env.production`; they get env from Terraform.
 
 ## Environment files
 
-| File                                                 | Purpose |
-| ---------------------------------------------------- | ------- |
+| File                                                 | Purpose                                                                                                                                  |
+| ---------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------- |
 | [`.env.local.example`](.env.local.example)           | Template → **`.env.local`** — local dev (Docker Postgres + LocalStack). Used by `pnpm dev:local`, `pnpm dev:api`, `pnpm migrate:deploy`. |
-| [`.env.production.example`](.env.production.example) | Template → **`.env.production`** — **only** for `pnpm migrate:deploy:prod` against RDS. |
+| [`.env.production.example`](.env.production.example) | Template → **`.env.production`** — **only** for `pnpm migrate:deploy:prod` against RDS.                                                  |
 
 The API loads **`.env.local`** via `dotenv-cli` on `pnpm dev` scripts. The worker loads **`.env.local`** when run locally ([`worker/README.md`](worker/README.md)).
 
