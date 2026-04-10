@@ -156,7 +156,8 @@ jobs:
           ECR_API: ${{ secrets.ECR_API_REPOSITORY_URL }}
         run: |
           IMG="${ECR_API}:${{ github.sha }}"
-          docker build -f api/Dockerfile -t "$IMG" -t "$ECR_API:latest" .
+          docker build -f api/Dockerfile -t "$IMG" -t "$ECR_API:latest" \
+            --build-arg "VITE_GOOGLE_CLIENT_ID=${{ secrets.VITE_GOOGLE_CLIENT_ID }}" .
           docker run --rm -w /app/api "$IMG" \
             node --input-type=module -e "await import('cors'); console.log('cors ok');"
           docker push "$IMG"

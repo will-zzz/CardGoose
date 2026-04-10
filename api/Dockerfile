@@ -14,6 +14,9 @@ WORKDIR /app/api
 ENV DATABASE_URL="postgresql://placeholder:placeholder@localhost:5432/placeholder"
 RUN pnpm exec prisma generate && pnpm run build
 WORKDIR /app
+# Baked into the SPA at build time (OAuth 2.0 Web client ID from Google Cloud Console).
+ARG VITE_GOOGLE_CLIENT_ID=
+ENV VITE_GOOGLE_CLIENT_ID=$VITE_GOOGLE_CLIENT_ID
 RUN pnpm --filter frontend build
 
 FROM node:20-alpine AS production
