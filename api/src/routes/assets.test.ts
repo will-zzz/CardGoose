@@ -37,9 +37,7 @@ describe('assets routes', () => {
 
   it('404 when project missing', async () => {
     prisma.project.findFirst.mockResolvedValueOnce(null);
-    const res = await request(app)
-      .get('/api/projects/p1/assets')
-      .set(authed());
+    const res = await request(app).get('/api/projects/p1/assets').set(authed());
     expect(res.status).toBe(404);
   });
 
@@ -48,9 +46,7 @@ describe('assets routes', () => {
     prisma.asset.findMany.mockResolvedValueOnce([
       { id: '1', artKey: 'a', s3Key: 'k', createdAt: new Date(), updatedAt: new Date() },
     ]);
-    const res = await request(app)
-      .get('/api/projects/p1/assets')
-      .set(authed());
+    const res = await request(app).get('/api/projects/p1/assets').set(authed());
     expect(res.status).toBe(200);
     expect(res.body.assets[0].url).toBeUndefined();
   });
@@ -60,9 +56,7 @@ describe('assets routes', () => {
     prisma.asset.findMany.mockResolvedValueOnce([
       { id: '1', artKey: 'a', s3Key: 'k', createdAt: new Date(), updatedAt: new Date() },
     ]);
-    const res = await request(app)
-      .get('/api/projects/p1/assets?includeUrls=1')
-      .set(authed());
+    const res = await request(app).get('/api/projects/p1/assets?includeUrls=1').set(authed());
     expect(res.status).toBe(200);
     expect(res.body.assets[0].url).toBe('https://signed.example/o');
   });

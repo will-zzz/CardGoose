@@ -93,7 +93,9 @@ export function LoginPage() {
               if (tokenResponse.error) {
                 if (!shouldIgnoreGoogleUiError(tokenResponse.error)) {
                   showError(
-                    tokenResponse.error_description ?? tokenResponse.error ?? 'Google sign-in failed'
+                    tokenResponse.error_description ??
+                      tokenResponse.error ??
+                      'Google sign-in failed'
                   );
                 }
                 return;
@@ -155,12 +157,7 @@ export function LoginPage() {
           <span className="auth-divider-line" aria-hidden />
         </div>
 
-        <form
-          className="auth-form"
-          onSubmit={onSubmit}
-          aria-busy={busy}
-          noValidate
-        >
+        <form className="auth-form" onSubmit={onSubmit} aria-busy={busy} noValidate>
           {info && (
             <p id={infoId} className="auth-banner auth-banner--info" role="status">
               {info}

@@ -35,10 +35,7 @@ export function ToastProvider({ children }: { children: ReactNode }) {
   const showInfo = useCallback((message: string) => push(message, 'info'), [push]);
 
   // Stable reference so toast list updates don’t re-render every useToast() consumer.
-  const value = useMemo<ToastContextValue>(
-    () => ({ showError, showInfo }),
-    [showError, showInfo]
-  );
+  const value = useMemo<ToastContextValue>(() => ({ showError, showInfo }), [showError, showInfo]);
 
   return (
     <ToastContext.Provider value={value}>

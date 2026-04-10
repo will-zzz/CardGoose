@@ -446,9 +446,7 @@ describe('projects routes', () => {
         text: async () => 'N,v\n1,x',
         headers: {
           get: (h: string) =>
-            h === 'content-disposition'
-              ? 'attachment; filename="Export - Tab A.csv"'
-              : null,
+            h === 'content-disposition' ? 'attachment; filename="Export - Tab A.csv"' : null,
         },
       })
     );

@@ -114,13 +114,7 @@ type CardFaceProps = {
   layerRef?: Ref<KonvaLayer>;
 };
 
-function CardFaceInner({
-  state,
-  row,
-  assetUrls,
-  pixelWidth,
-  layerRef,
-}: CardFaceProps) {
+function CardFaceInner({ state, row, assetUrls, pixelWidth, layerRef }: CardFaceProps) {
   const scale = pixelWidth / state.width;
   const pixelHeight = state.height * scale;
   const bg = state.background ?? '#1e1e24';
