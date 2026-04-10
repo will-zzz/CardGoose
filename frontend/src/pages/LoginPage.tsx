@@ -2,6 +2,7 @@ import { useId, useState, type FormEvent } from 'react';
 import { Navigate } from 'react-router-dom';
 import { Loader2 } from 'lucide-react';
 import { BrandLogo } from '../components/BrandLogo';
+import { loadGsiScript } from '../lib/loadGsiScript';
 import { useAuth } from '../contexts/useAuth';
 
 function GoogleGlyph({ className }: { className?: string }) {
@@ -27,25 +28,37 @@ function GoogleGlyph({ className }: { className?: string }) {
   );
 }
 
+/** Apple mark (Font Awesome–style path); viewBox matches path coordinates. */
 function AppleGlyph({ className }: { className?: string }) {
   return (
-    <svg className={className} viewBox="0 0 24 24" aria-hidden>
+    <svg
+      className={className}
+      viewBox="0 0 384 512"
+      aria-hidden
+      preserveAspectRatio="xMidYMid meet"
+    >
       <path
         fill="currentColor"
-        d="M16.365 1.43c0 1.14-.493 2.396-1.182 3.114-.709.758-1.942 1.344-2.978 1.15-.23-1.09.484-2.284 1.165-2.982.742-.767 2.078-1.323 2.995-1.282zm4.635 16.577c-.353.823-.755 1.605-1.218 2.357-1.656 2.54-2.46 3.616-4.09 5.814-1.596 2.15-3.774 4.831-6.506 4.85-1.225.01-1.963-.322-2.75-.658-1.004-.42-1.928-.81-3.008-.785-1.137.026-2.04.43-3.044.852-.787.336-1.51.764-2.735.675-2.705-.19-4.69-2.504-6.286-4.654-3.42-4.61-3.803-10.01-1.684-12.87 1.63-2.19 4.218-3.468 6.646-3.468 1.24 0 2.396.418 3.4.794.86.31 1.648.593 2.385.593.79 0 1.618-.29 2.536-.615.903-.32 1.9-.672 3.037-.637 1.054.03 2.02.29 2.89.672-1.006 1.227-1.59 2.79-1.59 4.4 0 3.26 2.65 5.92 5.92 5.92.35 0 .69-.03 1.03-.08-.66 1.95-1.24 3.9-1.97 5.83z"
+        d="M318.7 268.7c-.2-36.7 16.4-64.4 50-84.8-18.8-26.9-47.2-41.7-84.7-44.6-35.5-2.8-74.3 20.7-88.5 20.7-15 0-49.4-19.7-76.4-19.7C63.3 141.2 4 184.8 4 273.5q0 39.1 14.4 81.2c12.8 36.7 59 126.7 107.2 125.2 25.6-.7 44-16.4 81.2-16.4 38.5 0 49.8 16.4 81.2 16.4 48.3-.8 89.1-68.1 101.8-104.8-57.4-26.6-86.7-67.2-86.5-121.1zm-39.9-249.3c21.4-25.9 35.8-61.9 31.8-98-33.5 2.1-74 22.4-98 50-19.8 22.2-37.2 58.2-32.6 97.5 35.1 2.1 71.2-17.9 98.8-49.5z"
       />
     </svg>
   );
 }
 
+function shouldIgnoreGoogleUiError(code: string): boolean {
+  const c = code.toLowerCase();
+  return c.includes('popup') || c.includes('cancel') || c === 'access_denied';
+}
+
 export function LoginPage() {
-  const { user, login, register } = useAuth();
+  const { user, login, register, loginWithGoogle } = useAuth();
   const [mode, setMode] = useState<'login' | 'register'>('login');
-  const [username, setUsername] = useState('');
+  const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [info, setInfo] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  const [googleBusy, setGoogleBusy] = useState(false);
   const errorId = useId();
   const infoId = useId();
 
@@ -63,8 +76,8 @@ export function LoginPage() {
     clearMessages();
     setBusy(true);
     try {
-      if (mode === 'login') await login(username, password);
-      else await register(username, password);
+      if (mode === 'login') await login(email, password);
+      else await register(email, password);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Request failed');
     } finally {
@@ -72,13 +85,57 @@ export function LoginPage() {
     }
   }
 
-  function onSocialPlaceholder(provider: 'google' | 'apple') {
+  async function onGoogleClick() {
     clearMessages();
-    setInfo(
-      provider === 'google'
-        ? 'Google sign-in is not enabled for this deployment yet. Use email and password below.'
-        : 'Apple sign-in is not enabled for this deployment yet. Use email and password below.'
-    );
+    const cid = import.meta.env.VITE_GOOGLE_CLIENT_ID?.trim();
+    if (!cid) {
+      setError(
+        'Google sign-in is not configured. Set VITE_GOOGLE_CLIENT_ID in your environment (OAuth 2.0 Web client ID).'
+      );
+      return;
+    }
+
+    setGoogleBusy(true);
+    try {
+      await loadGsiScript();
+      if (!window.google?.accounts?.oauth2) {
+        throw new Error('Google Sign-In did not initialize');
+      }
+
+      const client = window.google.accounts.oauth2.initTokenClient({
+        client_id: cid,
+        scope: 'openid email profile',
+        callback: (tokenResponse) => {
+          void (async () => {
+            try {
+              if (tokenResponse.error) {
+                if (!shouldIgnoreGoogleUiError(tokenResponse.error)) {
+                  setError(
+                    tokenResponse.error_description ?? tokenResponse.error ?? 'Google sign-in failed'
+                  );
+                }
+                return;
+              }
+              if (!tokenResponse.access_token) return;
+              await loginWithGoogle(tokenResponse.access_token);
+            } catch (err) {
+              setError(err instanceof Error ? err.message : 'Google sign-in failed');
+            } finally {
+              setGoogleBusy(false);
+            }
+          })();
+        },
+      });
+      client.requestAccessToken({ prompt: '' });
+    } catch (err) {
+      setGoogleBusy(false);
+      setError(err instanceof Error ? err.message : 'Could not start Google sign-in');
+    }
+  }
+
+  function onApplePlaceholder() {
+    clearMessages();
+    setInfo('Apple sign-in is not enabled for this deployment yet. Use email and password or Google.');
   }
 
   const heading = mode === 'login' ? 'Welcome back' : 'Create your account';
@@ -102,17 +159,24 @@ export function LoginPage() {
           <button
             type="button"
             className="auth-social-btn auth-social-btn--google"
-            onClick={() => onSocialPlaceholder('google')}
+            onClick={() => void onGoogleClick()}
+            disabled={googleBusy || busy}
+            aria-busy={googleBusy}
           >
-            <GoogleGlyph className="auth-social-icon" />
-            <span>Continue with Google</span>
+            {googleBusy ? (
+              <Loader2 className="auth-social-spinner" aria-hidden />
+            ) : (
+              <GoogleGlyph className="auth-social-icon" />
+            )}
+            <span>{googleBusy ? 'Connecting…' : 'Continue with Google'}</span>
           </button>
           <button
             type="button"
             className="auth-social-btn auth-social-btn--apple"
-            onClick={() => onSocialPlaceholder('apple')}
+            onClick={onApplePlaceholder}
+            disabled={busy || googleBusy}
           >
-            <AppleGlyph className="auth-social-icon" />
+            <AppleGlyph className="auth-social-icon auth-social-icon--apple" />
             <span>Continue with Apple</span>
           </button>
         </div>
@@ -141,18 +205,19 @@ export function LoginPage() {
           )}
 
           <label className="auth-field">
-            <span className="auth-label">Email or username</span>
+            <span className="auth-label">Email</span>
             <input
               className="auth-input"
-              value={username}
+              type="email"
+              value={email}
               onChange={(e) => {
-                setUsername(e.target.value);
+                setEmail(e.target.value);
                 if (error) setError(null);
                 if (info) setInfo(null);
               }}
-              autoComplete="username"
+              autoComplete="email"
+              inputMode="email"
               required
-              minLength={2}
               aria-invalid={error ? true : undefined}
               aria-describedby={error ? errorId : info ? infoId : undefined}
             />
@@ -192,7 +257,7 @@ export function LoginPage() {
           <button
             type="submit"
             className="auth-primary"
-            disabled={busy}
+            disabled={busy || googleBusy}
             aria-busy={busy}
           >
             {busy ? (

@@ -7,11 +7,11 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
-/// Auth: username + password (hashed); JWT issued separately.
+/// Auth: unique `username` stores normalized email; password optional for Google-only accounts.
 model User {
   id           String   @id @default(uuid()) @db.Uuid
   username     String   @unique
-  passwordHash String   @map("password_hash")
+  passwordHash String?  @map("password_hash")
   createdAt DateTime  @default(now()) @map("created_at")
   updatedAt DateTime  @updatedAt @map("updated_at")
 

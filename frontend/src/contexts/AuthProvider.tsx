@@ -16,10 +16,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const login = useCallback(
-    async (username: string, password: string) => {
+    async (email: string, password: string) => {
       const data = await apiJson<{ token: string; user: AuthUser }>('/api/auth/login', {
         method: 'POST',
-        body: JSON.stringify({ username, password }),
+        body: JSON.stringify({ email, password }),
       });
       persist(data.token, data.user);
     },
@@ -27,10 +27,21 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   );
 
   const register = useCallback(
-    async (username: string, password: string) => {
+    async (email: string, password: string) => {
       const data = await apiJson<{ token: string; user: AuthUser }>('/api/auth/register', {
         method: 'POST',
-        body: JSON.stringify({ username, password }),
+        body: JSON.stringify({ email, password }),
+      });
+      persist(data.token, data.user);
+    },
+    [persist]
+  );
+
+  const loginWithGoogle = useCallback(
+    async (accessToken: string) => {
+      const data = await apiJson<{ token: string; user: AuthUser }>('/api/auth/google', {
+        method: 'POST',
+        body: JSON.stringify({ accessToken }),
       });
       persist(data.token, data.user);
     },
@@ -43,8 +54,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const value = useMemo(
-    () => ({ token, user, login, register, logout }),
-    [token, user, login, register, logout]
+    () => ({ token, user, login, register, loginWithGoogle, logout }),
+    [token, user, login, register, loginWithGoogle, logout]
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

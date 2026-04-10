@@ -320,6 +320,18 @@ body.layout-editor-open .main.main-wide {
   flex-shrink: 0;
 }
 
+.auth-social-icon--apple {
+  width: 15px;
+  height: 19px;
+}
+
+.auth-social-spinner {
+  width: 18px;
+  height: 18px;
+  flex-shrink: 0;
+  animation: layout-save-spin 0.75s linear infinite;
+}
+
 .auth-divider {
   display: flex;
   align-items: center;
