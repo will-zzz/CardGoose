@@ -53,10 +53,7 @@ type Props = {
   onArtKeyPicked?: (artKey: string) => void;
 };
 
-type ViewKind =
-  | { kind: 'all' }
-  | { kind: 'unused' }
-  | { kind: 'folder'; folderId: string };
+type ViewKind = { kind: 'all' } | { kind: 'unused' } | { kind: 'folder'; folderId: string };
 
 type TreeNav = {
   scope: AssetFolderScope;
@@ -93,7 +90,11 @@ function folderAncestorChainNames(
 }
 
 /** Virtual path from folder hierarchy + art key, e.g. `/test_folder/will.png` */
-function virtualAssetPath(asset: StudioAssetRow, scope: AssetFolderScope, store: AssetFolderStore): string {
+function virtualAssetPath(
+  asset: StudioAssetRow,
+  scope: AssetFolderScope,
+  store: AssetFolderStore
+): string {
   const fid = store.assignments[assignKey(scope, asset.id)];
   const segs = fid ? folderAncestorChainNames(store, scope, fid) : [];
   const leaf = asset.artKey.replace(/^\/+/, '');
@@ -156,9 +157,12 @@ export function AssetsTabPanel({
     saveAssetFolderStore(projectId, folderStore);
   }, [projectId, folderStore]);
 
-  const persistFolderStore = useCallback((updater: (prev: AssetFolderStore) => AssetFolderStore) => {
-    setFolderStore(updater);
-  }, []);
+  const persistFolderStore = useCallback(
+    (updater: (prev: AssetFolderStore) => AssetFolderStore) => {
+      setFolderStore(updater);
+    },
+    []
+  );
 
   const filter = useCallback(
     (rows: StudioAssetRow[]) => {
@@ -278,7 +282,8 @@ export function AssetsTabPanel({
   }, [selectedAsset, selectedAssetScope, folderStore]);
 
   const treeAcceptsInternalDrag = (e: React.DragEvent) =>
-    e.dataTransfer.types.includes(ASSET_DRAG_MIME) || e.dataTransfer.types.includes(FOLDER_DRAG_MIME);
+    e.dataTransfer.types.includes(ASSET_DRAG_MIME) ||
+    e.dataTransfer.types.includes(FOLDER_DRAG_MIME);
 
   const leaveDropHost = (e: React.DragEvent) => {
     const cur = e.currentTarget as HTMLElement;
@@ -295,7 +300,10 @@ export function AssetsTabPanel({
       let raw = e.dataTransfer.getData(ASSET_DRAG_MIME);
       if (raw) {
         try {
-          const { scope, assetId } = JSON.parse(raw) as { scope: AssetFolderScope; assetId: string };
+          const { scope, assetId } = JSON.parse(raw) as {
+            scope: AssetFolderScope;
+            assetId: string;
+          };
           if (target.scope !== scope) return;
           if (target.kind === 'folder') {
             setAssetFolderAssignment(scope, assetId, target.folderId);
@@ -310,7 +318,10 @@ export function AssetsTabPanel({
       raw = e.dataTransfer.getData(FOLDER_DRAG_MIME);
       if (!raw) return;
       try {
-        const { scope, folderId } = JSON.parse(raw) as { scope: AssetFolderScope; folderId: string };
+        const { scope, folderId } = JSON.parse(raw) as {
+          scope: AssetFolderScope;
+          folderId: string;
+        };
         if (target.scope !== scope) return;
         if (target.kind === 'folder') {
           if (folderId === target.folderId) return;
@@ -489,7 +500,8 @@ export function AssetsTabPanel({
     setNav({ scope, view: { kind: 'folder', folderId: id } });
   };
 
-  const dropKeyFolder = (scope: AssetFolderScope, folderId: string) => `folder:${scope}:${folderId}`;
+  const dropKeyFolder = (scope: AssetFolderScope, folderId: string) =>
+    `folder:${scope}:${folderId}`;
 
   const renderFolderSubtree = (scope: AssetFolderScope, parentId: string | null, depth: number) => {
     const rows = childFolders(scope, parentId)
@@ -557,9 +569,7 @@ export function AssetsTabPanel({
               </button>
             </div>
           </div>
-          {isOpen && hasChildren && (
-            <div>{renderFolderSubtree(scope, f.id, depth + 1)}</div>
-          )}
+          {isOpen && hasChildren && <div>{renderFolderSubtree(scope, f.id, depth + 1)}</div>}
         </div>
       );
     });
@@ -602,7 +612,11 @@ export function AssetsTabPanel({
                   aria-label={expandedLibrary.has('project') ? 'Collapse' : 'Expand'}
                   onClick={() => toggleLibrary('project')}
                 >
-                  {expandedLibrary.has('project') ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
+                  {expandedLibrary.has('project') ? (
+                    <ChevronDown size={14} />
+                  ) : (
+                    <ChevronRight size={14} />
+                  )}
                 </button>
                 <button
                   type="button"
@@ -692,7 +706,11 @@ export function AssetsTabPanel({
                   aria-label={expandedLibrary.has('global') ? 'Collapse' : 'Expand'}
                   onClick={() => toggleLibrary('global')}
                 >
-                  {expandedLibrary.has('global') ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
+                  {expandedLibrary.has('global') ? (
+                    <ChevronDown size={14} />
+                  ) : (
+                    <ChevronRight size={14} />
+                  )}
                 </button>
                 <button
                   type="button"
@@ -804,7 +822,8 @@ export function AssetsTabPanel({
         >
           {!isDraggingFiles && (
             <p className="assets-shell-drop-ghost">
-              Drag files here to upload to the {nav.scope === 'project' ? 'project' : 'global'} library.
+              Drag files here to upload to the {nav.scope === 'project' ? 'project' : 'global'}{' '}
+              library.
             </p>
           )}
           {isDraggingFiles && (
@@ -831,13 +850,15 @@ export function AssetsTabPanel({
                     selectAsset(a);
                   }}
                   onDragStart={
-                    artPickerMode
-                      ? undefined
-                      : (e) => onAssetDragStart(e, nav.scope, a.id)
+                    artPickerMode ? undefined : (e) => onAssetDragStart(e, nav.scope, a.id)
                   }
                 >
                   <div className={thumbClass}>
-                    {a.url ? <img src={a.url} alt="" loading="lazy" /> : <span className="assets-shell-no-prev">No preview</span>}
+                    {a.url ? (
+                      <img src={a.url} alt="" loading="lazy" />
+                    ) : (
+                      <span className="assets-shell-no-prev">No preview</span>
+                    )}
                   </div>
                   <div className="assets-shell-cell-label" title={a.artKey}>
                     {a.artKey}
@@ -862,7 +883,9 @@ export function AssetsTabPanel({
           Inspector
         </div>
         {!selectedAsset && (
-          <p className="assets-shell-inspector-empty">Select an asset to inspect metadata and usage.</p>
+          <p className="assets-shell-inspector-empty">
+            Select an asset to inspect metadata and usage.
+          </p>
         )}
         {selectedAsset && (
           <>
@@ -885,7 +908,11 @@ export function AssetsTabPanel({
                 disabled={busy}
                 onClick={() => void promoteSelected()}
               >
-                {busy ? <Loader2 size={16} className="assets-shell-spin" /> : <Globe size={16} aria-hidden />}
+                {busy ? (
+                  <Loader2 size={16} className="assets-shell-spin" />
+                ) : (
+                  <Globe size={16} aria-hidden />
+                )}
                 Make global
               </button>
             )}
@@ -896,7 +923,9 @@ export function AssetsTabPanel({
                 Used in layouts
               </div>
               {usageLayouts.length === 0 ? (
-                <p className="assets-shell-usage-empty">No layout image zones reference this art key.</p>
+                <p className="assets-shell-usage-empty">
+                  No layout image zones reference this art key.
+                </p>
               ) : (
                 <ul className="assets-shell-usage-list">
                   {usageLayouts.map((L) => (

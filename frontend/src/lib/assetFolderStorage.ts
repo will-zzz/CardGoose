@@ -25,8 +25,7 @@ export function loadAssetFolderStore(projectId: string): AssetFolderStore {
     if (!raw) return { folders: [], assignments: {} };
     const p = JSON.parse(raw) as Partial<AssetFolderStore>;
     const folders = Array.isArray(p.folders) ? p.folders : [];
-    const assignments =
-      p.assignments && typeof p.assignments === 'object' ? p.assignments : {};
+    const assignments = p.assignments && typeof p.assignments === 'object' ? p.assignments : {};
     return { folders, assignments };
   } catch {
     return { folders: [], assignments: {} };

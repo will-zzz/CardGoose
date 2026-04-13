@@ -2,12 +2,7 @@ import { Router, type IRouter } from 'express';
 import multer from 'multer';
 import { prisma } from '../lib/prisma.js';
 import { requireAuth } from '../middleware/auth.js';
-import {
-  copyObjectSameBucket,
-  getAssetsBucket,
-  getSignedGetUrl,
-  putObject,
-} from '../lib/s3.js';
+import { copyObjectSameBucket, getAssetsBucket, getSignedGetUrl, putObject } from '../lib/s3.js';
 
 export const assetsRouter: IRouter = Router();
 assetsRouter.use(requireAuth);

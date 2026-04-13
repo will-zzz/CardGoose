@@ -615,11 +615,9 @@ button[type='submit']:not(.auth-primary),
     .card-group-url-drawer-save
   ):not(.card-group-url-drawer-cancel):not(.assets-shell-ctrl):not(.layout-col-combo-trigger):not(
     .layout-col-combo-option
-  ):not(.layout-col-combo-clear):not(.layout-fallback-asset-btn):not(.layout-fallback-clear-btn):not(
-    .layout-asset-picker-close
-  ):not(
-    .layout-list-row-hit
-  ) {
+  ):not(.layout-col-combo-clear):not(.layout-fallback-asset-btn):not(
+    .layout-fallback-clear-btn
+  ):not(.layout-asset-picker-close):not(.layout-list-row-hit) {
   padding: 10px 14px;
   border-radius: 6px;
   border: 1px solid var(--accent-border);
@@ -3387,7 +3385,9 @@ button.zone-tool--icon:hover:not(:disabled) {
 .assets-shell-tree-leaf-drop,
 .assets-shell-tree-folder-drop {
   border-radius: 6px;
-  transition: background 0.1s ease, box-shadow 0.1s ease;
+  transition:
+    background 0.1s ease,
+    box-shadow 0.1s ease;
 }
 
 .assets-shell-tree-drop-host--hover {
@@ -3599,7 +3599,9 @@ button.zone-tool--icon:hover:not(:disabled) {
   overflow: auto;
   padding: 12px 16px 20px;
   background: var(--bg);
-  transition: box-shadow 0.15s ease, background 0.15s ease;
+  transition:
+    box-shadow 0.15s ease,
+    background 0.15s ease;
 }
 
 .assets-shell-gallery--drag-active {

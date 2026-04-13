@@ -610,7 +610,16 @@ export const LayoutEditor = forwardRef<LayoutEditorHandle, LayoutEditorProps>(fu
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
-  }, [undo, redo, zoomToFit, zoomTo100Percent, zoomInFromMenu, zoomOutFromMenu, selectedId, deleteSelected]);
+  }, [
+    undo,
+    redo,
+    zoomToFit,
+    zoomTo100Percent,
+    zoomInFromMenu,
+    zoomOutFromMenu,
+    selectedId,
+    deleteSelected,
+  ]);
 
   useLayoutEffect(() => {
     const el = canvasFillRef.current;
@@ -781,9 +790,7 @@ export const LayoutEditor = forwardRef<LayoutEditorHandle, LayoutEditorProps>(fu
 
   const activePreviewOption = useMemo(() => {
     if (deckPreviewOptions.length === 0) return undefined;
-    return (
-      deckPreviewOptions.find((o) => o.id === activePreviewSourceId) ?? deckPreviewOptions[0]
-    );
+    return deckPreviewOptions.find((o) => o.id === activePreviewSourceId) ?? deckPreviewOptions[0];
   }, [deckPreviewOptions, activePreviewSourceId]);
   const effectiveRows = useMemo(
     () => activePreviewOption?.rows ?? EMPTY_PREVIEW_ROWS,

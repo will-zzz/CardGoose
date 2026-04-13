@@ -99,7 +99,9 @@ function CardNode({
   if (!isVisible(node)) return null;
   if (node.type === 'rect') return <RectEl el={node} />;
   if (node.type === 'text') return <TextEl el={node} row={row} />;
-  return <ImageEl el={node} row={row} assetUrls={assetUrls} assetResolveOrder={assetResolveOrder} />;
+  return (
+    <ImageEl el={node} row={row} assetUrls={assetUrls} assetResolveOrder={assetResolveOrder} />
+  );
 }
 
 function rowDataEqual(a: Record<string, string>, b: Record<string, string>): boolean {

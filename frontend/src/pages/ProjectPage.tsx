@@ -132,9 +132,12 @@ export function ProjectPage() {
   const loadPipeline = useCallback(async () => {
     if (!token || !id) return;
     const [a, e] = await Promise.all([
-      apiJson<{ assets: Asset[]; globalAssets: Asset[] }>(`/api/projects/${id}/assets?includeUrls=1`, {
-        token,
-      }),
+      apiJson<{ assets: Asset[]; globalAssets: Asset[] }>(
+        `/api/projects/${id}/assets?includeUrls=1`,
+        {
+          token,
+        }
+      ),
       apiJson<{ exports: ExportRow[] }>(`/api/projects/${id}/exports`, { token }),
     ]);
     setAssets(a.assets);
@@ -162,9 +165,7 @@ export function ProjectPage() {
           layoutId: g.layoutId ?? null,
         }))
       );
-      setAnyCardGroupPublishedUrl(
-        res.cardGroups.some((g) => Boolean(g.csvSourceUrl?.trim()))
-      );
+      setAnyCardGroupPublishedUrl(res.cardGroups.some((g) => Boolean(g.csvSourceUrl?.trim())));
     } catch {
       // non-critical for layout editor; card groups just won't appear as data sources
     }
@@ -442,8 +443,7 @@ export function ProjectPage() {
       projectId: id,
       projectName: project.name,
       tab,
-      hasPublishedSheet:
-        Boolean(project.csvSourceUrl?.trim()) || anyCardGroupPublishedUrl,
+      hasPublishedSheet: Boolean(project.csvSourceUrl?.trim()) || anyCardGroupPublishedUrl,
       navigateTab,
       onNavigateHomeClick,
     });

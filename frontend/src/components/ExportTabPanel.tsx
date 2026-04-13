@@ -27,8 +27,8 @@ export function ExportTabPanel({
         <h2>Export PDF</h2>
         <p className="muted" style={{ maxWidth: 560 }}>
           Enqueues on SQS — the request finishes quickly while a worker renders the PDF. Run{' '}
-          <code>python -m baker.main</code> (or your ECS worker) with <code>RENDER_URL</code> set
-          to this dev server.
+          <code>python -m baker.main</code> (or your ECS worker) with <code>RENDER_URL</code> set to
+          this dev server.
         </p>
         <label className="stack" style={{ maxWidth: 360, marginBottom: 12 }}>
           <span>

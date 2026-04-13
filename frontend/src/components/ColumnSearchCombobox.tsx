@@ -21,9 +21,7 @@ export function ColumnSearchCombobox({
   const rootRef = useRef<HTMLDivElement>(null);
   const listId = useId();
   const qLower = q.trim().toLowerCase();
-  const filtered = qLower
-    ? options.filter((o) => o.toLowerCase().includes(qLower))
-    : options;
+  const filtered = qLower ? options.filter((o) => o.toLowerCase().includes(qLower)) : options;
 
   useEffect(() => {
     if (!open) return;
