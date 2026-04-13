@@ -1,5 +1,6 @@
+import { mergeAssetS3KeysByNormalizedKey, normalizeArtLookupKey } from './assetResolve.js';
 import { prisma } from './prisma.js';
-import { collectArtKeysFromLayoutState } from './layoutArtKeys.js';
+import { collectPdfPrefetchArtKeys } from './layoutArtKeys.js';
 import { getAssetsBucket, getSignedGetUrl } from './s3.js';
 
 /** UI / server default; slider range is 150–300. */
@@ -77,18 +78,42 @@ export async function buildPdfExportPayload(
 
   const artKeys = new Set<string>();
   for (const eg of exportGroups) {
-    for (const k of collectArtKeysFromLayoutState(eg.layout)) artKeys.add(k);
+    for (const k of collectPdfPrefetchArtKeys(eg.layout, eg.rows)) artKeys.add(k);
   }
 
-  const assets = await prisma.asset.findMany({
-    where: { projectId, artKey: { in: [...artKeys] } },
-    select: { artKey: true, s3Key: true },
-  });
+  const [projectAssets, globalAssets] = await Promise.all([
+    prisma.asset.findMany({
+      where: { projectId },
+      select: { artKey: true, s3Key: true },
+    }),
+    prisma.globalAsset.findMany({
+      where: { userId },
+      select: { artKey: true, s3Key: true },
+    }),
+  ]);
+
+  const merged = mergeAssetS3KeysByNormalizedKey(projectAssets, globalAssets);
+  const seenOrder = new Set<string>();
+  const assetResolveOrder: string[] = [];
+  for (const a of projectAssets) {
+    const n = normalizeArtLookupKey(a.artKey);
+    if (seenOrder.has(n)) continue;
+    seenOrder.add(n);
+    assetResolveOrder.push(a.artKey);
+  }
+  for (const a of globalAssets) {
+    const n = normalizeArtLookupKey(a.artKey);
+    if (seenOrder.has(n)) continue;
+    seenOrder.add(n);
+    assetResolveOrder.push(a.artKey);
+  }
 
   const assetsBucket = getAssetsBucket();
   const assetUrls: Record<string, string> = {};
-  for (const a of assets) {
-    assetUrls[a.artKey] = await getSignedGetUrl(assetsBucket, a.s3Key, 3600);
+  for (const rk of artKeys) {
+    const sk = merged.get(normalizeArtLookupKey(rk));
+    if (!sk) continue;
+    assetUrls[rk.trim()] = await getSignedGetUrl(assetsBucket, sk, 3600);
   }
 
   const timestamp = new Date().toISOString();
@@ -102,6 +127,7 @@ export async function buildPdfExportPayload(
     dpi: resolveExportPdfDpi(options?.dpi),
     groups: exportGroups,
     assetUrls,
+    assetResolveOrder,
   };
 
   return { payload, timestamp };

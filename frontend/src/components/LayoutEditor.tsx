@@ -22,11 +22,14 @@ import {
   Text,
   Transformer,
 } from 'react-konva';
-import { ChevronDown, Database, Layers, Minus, Plus } from 'lucide-react';
+import { Database, Image as ImageLucide, Layers, Minus, Plus, Table2, X } from 'lucide-react';
 import type { LayoutElement, LayoutStateV2 } from '../types/layout';
 import { DEFAULT_NEW_TEXT } from '../types/layout';
+import { normalizeArtLookupKey, smartResolveLayoutImageUrl } from '../lib/assetResolve';
 import { applyTemplate } from '../lib/template';
+import { AssetsTabPanel, type StudioAssetRow } from './AssetsTabPanel';
 import { CardFace } from './CardFace';
+import { ColumnSearchCombobox } from './ColumnSearchCombobox';
 import { useImageElement } from './useImageElement';
 import { LayoutEditorFooterButton, LayoutEditorFooterValueStrip } from './LayoutEditorFooterButton';
 import { ZoneHierarchy, type ZoneHierarchyToolbarProps } from './ZoneHierarchy';
@@ -153,7 +156,9 @@ function TextEditorBlock({
 
 function ImageShape({
   el,
+  sampleRow,
   assetUrls,
+  orderedArtKeys,
   selected,
   setNodeRef,
   onSelect,
@@ -161,14 +166,16 @@ function ImageShape({
   onTransformEnd,
 }: {
   el: Extract<LayoutElement, { type: 'image' }>;
+  sampleRow: Record<string, string>;
   assetUrls: Record<string, string>;
+  orderedArtKeys: string[];
   selected: boolean;
   setNodeRef: (id: string, node: Konva.Node | null) => void;
   onSelect: (id: string) => void;
   onDragEnd: (e: KonvaEventObject<DragEvent>) => void;
   onTransformEnd: (e: KonvaEventObject<Event>) => void;
 }) {
-  const url = assetUrls[el.artKey];
+  const url = smartResolveLayoutImageUrl(el, sampleRow, assetUrls, orderedArtKeys);
   const img = useImageElement(url);
   const common = {
     id: el.id,
@@ -183,9 +190,11 @@ function ImageShape({
     onDragEnd,
     onTransformEnd,
   };
+  const urlKey = url ?? '';
   if (!img) {
     return (
       <Rect
+        key={`${el.id}-ph-${urlKey}`}
         ref={(r) => setNodeRef(el.id, r)}
         {...common}
         fill="#2a2a32"
@@ -196,6 +205,7 @@ function ImageShape({
   }
   return (
     <KonvaImage
+      key={`${el.id}-img-${urlKey}`}
       ref={(r) => setNodeRef(el.id, r)}
       {...common}
       image={img}
@@ -209,6 +219,7 @@ function EditorNode({
   node,
   selectedId,
   assetUrls,
+  orderedArtKeys,
   sampleRow,
   setNodeRef,
   onSelect,
@@ -218,6 +229,7 @@ function EditorNode({
   node: LayoutElement;
   selectedId: string | null;
   assetUrls: Record<string, string>;
+  orderedArtKeys: string[];
   sampleRow: Record<string, string>;
   setNodeRef: (id: string, node: Konva.Node | null) => void;
   onSelect: (id: string) => void;
@@ -309,7 +321,9 @@ function EditorNode({
   return (
     <ImageShape
       el={node}
+      sampleRow={sampleRow}
       assetUrls={assetUrls}
+      orderedArtKeys={orderedArtKeys}
       selected={sel}
       setNodeRef={setNodeRef}
       onSelect={onSelect}
@@ -366,7 +380,11 @@ function propsInspectorTitle(node: LayoutElement | null): string {
     const t = node.text ?? '';
     return t.length > 36 ? `${t.slice(0, 36)}…` : t || 'Text';
   }
-  if (node.type === 'image') return node.artKey || 'Image';
+  if (node.type === 'image') {
+    const c = node.dynamicSourceColumn?.trim();
+    if (c) return `{{${c}}}`;
+    return node.fallbackArtKey || node.artKey || 'Image';
+  }
   return 'Shape';
 }
 
@@ -381,29 +399,78 @@ export type LayoutEditorHandle = {
   zoomTo100Percent: () => void;
 };
 
-export type EditorDataSource = {
+export type DeckPreviewOption = {
   id: string;
   label: string;
   rows: Record<string, string>[];
+  /** CSV header row — use when row objects omit keys (e.g. empty first row). */
+  headers?: string[];
+  /** Card group’s linked layout id, or null for project dataset / sample. */
+  layoutId: string | null;
 };
+
+function defaultPreviewSourceId(
+  activeLayoutId: string | undefined,
+  options: DeckPreviewOption[]
+): string {
+  if (options.length === 0) return '__sample__';
+  if (activeLayoutId) {
+    const linked = options.find((o) => o.layoutId === activeLayoutId);
+    if (linked) return linked.id;
+  }
+  const withRows = options.find((o) => o.rows.length > 0);
+  if (withRows) return withRows.id;
+  return options[0].id;
+}
+
+type LayoutLite = { id: string; name: string; state: unknown };
 
 type LayoutEditorProps = {
   state: LayoutStateV2;
   onChange: (next: LayoutStateV2) => void;
   assetUrls: Record<string, string>;
   sampleRow: Record<string, string>;
-  deckRows?: Record<string, string>[];
-  dataSources?: EditorDataSource[];
+  deckPreviewOptions: DeckPreviewOption[];
+  activeLayoutId?: string | null;
   onCapabilitiesChange?: (c: { canUndo: boolean; canRedo: boolean }) => void;
+  /** Fuzzy resolver: project art keys first, then global. */
+  projectAssetArtKeys?: string[];
+  globalAssetArtKeys?: string[];
+  projectId?: string | null;
+  token?: string | null;
+  layoutsFull?: LayoutLite[];
+  projectAssets?: StudioAssetRow[];
+  globalAssets?: StudioAssetRow[];
+  onStudioAssetsRefresh?: () => void;
 };
 
 export const LayoutEditor = forwardRef<LayoutEditorHandle, LayoutEditorProps>(function LayoutEditor(
-  { state, onChange, assetUrls, sampleRow, deckRows = [], dataSources = [], onCapabilitiesChange },
+  {
+    state,
+    onChange,
+    assetUrls,
+    sampleRow,
+    deckPreviewOptions,
+    activeLayoutId,
+    onCapabilitiesChange,
+    projectAssetArtKeys = [],
+    globalAssetArtKeys = [],
+    projectId = null,
+    token = null,
+    layoutsFull = [],
+    projectAssets = [],
+    globalAssets = [],
+    onStudioAssetsRefresh,
+  },
   ref
 ) {
   const [selectedId, setSelectedId] = useState<string | null>(null);
-  const [selectedDataSourceId, setSelectedDataSourceId] = useState<string | null>(null);
-  const [dataSourceMenuOpen, setDataSourceMenuOpen] = useState(false);
+  const [previewSourceId, setPreviewSourceId] = useState<string>(() =>
+    defaultPreviewSourceId(activeLayoutId ?? undefined, deckPreviewOptions)
+  );
+  const [previewSourceMenuOpen, setPreviewSourceMenuOpen] = useState(false);
+  const previewSourceMenuRef = useRef<HTMLDivElement>(null);
+  const [assetPickerOpen, setAssetPickerOpen] = useState(false);
   const [canUndo, setCanUndo] = useState(false);
   const [canRedo, setCanRedo] = useState(false);
   const historyPast = useRef<LayoutStateV2[]>([]);
@@ -464,6 +531,12 @@ export const LayoutEditor = forwardRef<LayoutEditorHandle, LayoutEditorProps>(fu
     setZoomPercent((p) => clampZoomPercent(p - ZOOM_STEP_FINE));
   }, []);
 
+  const deleteSelected = useCallback(() => {
+    if (!selectedId) return;
+    commit({ ...state, root: removeNodeById(state.root, selectedId) });
+    setSelectedId(null);
+  }, [selectedId, state, commit]);
+
   useImperativeHandle(
     ref,
     () => ({
@@ -491,9 +564,25 @@ export const LayoutEditor = forwardRef<LayoutEditorHandle, LayoutEditorProps>(fu
   }, [canUndo, canRedo, onCapabilitiesChange]);
 
   useEffect(() => {
+    setPreviewSourceId((prev) =>
+      deckPreviewOptions.some((o) => o.id === prev)
+        ? prev
+        : defaultPreviewSourceId(activeLayoutId ?? undefined, deckPreviewOptions)
+    );
+  }, [deckPreviewOptions, activeLayoutId]);
+
+  useEffect(() => {
     const onKey = (e: globalThis.KeyboardEvent) => {
       const el = e.target as HTMLElement | null;
       if (el?.closest('input, textarea, select, [contenteditable="true"]')) return;
+
+      if (e.code === 'Delete' || e.code === 'Backspace') {
+        if (!selectedId) return;
+        e.preventDefault();
+        deleteSelected();
+        return;
+      }
+
       const meta = e.metaKey || e.ctrlKey;
       if (!meta) return;
 
@@ -525,7 +614,7 @@ export const LayoutEditor = forwardRef<LayoutEditorHandle, LayoutEditorProps>(fu
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
-  }, [undo, redo, zoomToFit, zoomTo100Percent, zoomInFromMenu, zoomOutFromMenu]);
+  }, [undo, redo, zoomToFit, zoomTo100Percent, zoomInFromMenu, zoomOutFromMenu, selectedId, deleteSelected]);
 
   useLayoutEffect(() => {
     const el = canvasFillRef.current;
@@ -601,7 +690,7 @@ export const LayoutEditor = forwardRef<LayoutEditorHandle, LayoutEditorProps>(fu
   const scale = fitScale * (zoomPercent / 100);
   const stageW = state.width * scale;
   const stageH = state.height * scale;
-  const showGrid = state.showGrid !== false;
+  const showGrid = state.showGrid ?? false;
 
   const toggleVisible = (id: string) => {
     commit(
@@ -666,6 +755,8 @@ export const LayoutEditor = forwardRef<LayoutEditorHandle, LayoutEditorProps>(fu
           width: Math.min(120, state.width - 80),
           height: 120,
           artKey: 'art',
+          dynamicSourceColumn: null,
+          fallbackArtKey: null,
           visible: true,
           locked: false,
         };
@@ -680,11 +771,7 @@ export const LayoutEditor = forwardRef<LayoutEditorHandle, LayoutEditorProps>(fu
         commit({ ...state, root: insertAfterSiblingDeep(state.root, selectedId, dup) });
         setSelectedId(dup.id);
       },
-      onRemove: () => {
-        if (!selectedId) return;
-        commit({ ...state, root: removeNodeById(state.root, selectedId) });
-        setSelectedId(null);
-      },
+      onRemove: deleteSelected,
       onUndo: () => undo(),
       onRedo: () => redo(),
       onToggleGrid: () => commit({ ...state, showGrid: !showGrid }),
@@ -693,19 +780,54 @@ export const LayoutEditor = forwardRef<LayoutEditorHandle, LayoutEditorProps>(fu
       showGrid,
       hasSelection: !!selectedId,
     }),
-    [state, selectedId, commit, undo, redo, canUndo, canRedo, showGrid]
+    [state, selectedId, commit, undo, redo, canUndo, canRedo, showGrid, deleteSelected]
   );
 
-  const activeSource = useMemo(
-    () => (selectedDataSourceId ? dataSources.find((s) => s.id === selectedDataSourceId) : null),
-    [selectedDataSourceId, dataSources]
-  );
-  const effectiveRows = activeSource ? activeSource.rows : deckRows;
-  const effectiveSampleRow = activeSource ? (activeSource.rows[0] ?? {}) : sampleRow;
+  const activePreviewOption = useMemo(() => {
+    if (deckPreviewOptions.length === 0) return undefined;
+    return deckPreviewOptions.find((o) => o.id === previewSourceId) ?? deckPreviewOptions[0];
+  }, [deckPreviewOptions, previewSourceId]);
+  const effectiveRows = activePreviewOption?.rows ?? [];
+  const effectiveSampleRow = effectiveRows[0] ?? {};
   const filmstripRows = effectiveRows.length > 0 ? effectiveRows : [{}];
+  const dataColumnHeaders = useMemo(() => {
+    const s = new Set<string>();
+    const hdrs = activePreviewOption?.headers;
+    if (Array.isArray(hdrs)) {
+      for (const h of hdrs) {
+        if (typeof h === 'string' && h.trim()) s.add(h.trim());
+      }
+    }
+    for (const r of effectiveRows) {
+      if (r && typeof r === 'object') {
+        for (const k of Object.keys(r)) {
+          if (k.trim()) s.add(k.trim());
+        }
+      }
+    }
+    return [...s].sort((a, b) => a.localeCompare(b, undefined, { sensitivity: 'base' }));
+  }, [effectiveRows, activePreviewOption?.headers]);
+
+  const orderedArtKeys = useMemo(() => {
+    const seen = new Set<string>();
+    const out: string[] = [];
+    for (const k of projectAssetArtKeys) {
+      const n = normalizeArtLookupKey(k);
+      if (seen.has(n)) continue;
+      seen.add(n);
+      out.push(k);
+    }
+    for (const k of globalAssetArtKeys) {
+      const n = normalizeArtLookupKey(k);
+      if (seen.has(n)) continue;
+      seen.add(n);
+      out.push(k);
+    }
+    return out;
+  }, [projectAssetArtKeys, globalAssetArtKeys]);
+
   const [deckPreviewOpen, setDeckPreviewOpen] = useState(false);
   const deckDrawerId = useId();
-  const dataSourceMenuRef = useRef<HTMLDivElement>(null);
 
   const zoomOut = useCallback((e: MouseEvent<HTMLButtonElement>) => {
     const step = e.shiftKey ? ZOOM_STEP_COARSE : ZOOM_STEP_FINE;
@@ -723,15 +845,18 @@ export const LayoutEditor = forwardRef<LayoutEditorHandle, LayoutEditorProps>(fu
   const bgColorInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
-    if (!dataSourceMenuOpen) return;
+    if (!previewSourceMenuOpen) return;
     const onClick = (e: Event) => {
-      if (dataSourceMenuRef.current && !dataSourceMenuRef.current.contains(e.target as Node)) {
-        setDataSourceMenuOpen(false);
+      if (
+        previewSourceMenuRef.current &&
+        !previewSourceMenuRef.current.contains(e.target as Node)
+      ) {
+        setPreviewSourceMenuOpen(false);
       }
     };
     document.addEventListener('mousedown', onClick);
     return () => document.removeEventListener('mousedown', onClick);
-  }, [dataSourceMenuOpen]);
+  }, [previewSourceMenuOpen]);
 
   const commitZoomInput = useCallback(() => {
     const raw = zoomInputDraft.trim();
@@ -837,16 +962,58 @@ export const LayoutEditor = forwardRef<LayoutEditorHandle, LayoutEditorProps>(fu
           )}
           {selected?.type === 'image' && (
             <>
-              <details className="props-accordion" open>
-                <summary>Image</summary>
-                <div className="props-accordion-body">
-                  <label>
-                    Art key
-                    <input
-                      type="text"
-                      value={selected.artKey}
-                      onChange={(e) => updateSelected({ artKey: e.target.value.trim() || 'art' })}
-                    />
+              <details className="props-accordion props-accordion--image-source" open>
+                <summary className="props-accordion-summary-with-icons">
+                  <ImageLucide size={14} aria-hidden />
+                  Image Source
+                </summary>
+                <div className="props-accordion-body props-accordion-body--image-source">
+                  <div className="layout-image-source-hint">
+                    <Database size={12} aria-hidden />
+                    <span>Columns come from the deck preview dataset (footer).</span>
+                  </div>
+                  <ColumnSearchCombobox
+                    label="Dynamic Image (from Data Source)"
+                    options={dataColumnHeaders}
+                    value={selected.dynamicSourceColumn ?? ''}
+                    onChange={(col) =>
+                      updateSelected({
+                        dynamicSourceColumn: col.trim() ? col.trim() : null,
+                      })
+                    }
+                  />
+                  <label className="layout-fallback-label">
+                    <span className="layout-fallback-label-text">Fallback Image</span>
+                    <div className="layout-fallback-row">
+                      <input
+                        type="text"
+                        readOnly
+                        className="layout-fallback-input"
+                        value={selected.fallbackArtKey ?? ''}
+                        placeholder="None — pick from Assets"
+                      />
+                      <button
+                        type="button"
+                        className="layout-fallback-asset-btn"
+                        title="Choose asset"
+                        aria-label="Open asset library"
+                        disabled={!projectId || !token}
+                        onClick={() => setAssetPickerOpen(true)}
+                      >
+                        <ImageLucide size={16} strokeWidth={2} aria-hidden />
+                      </button>
+                      {(selected.fallbackArtKey ?? '').trim() ? (
+                        <button
+                          type="button"
+                          className="layout-fallback-clear-btn"
+                          title="Clear fallback"
+                          aria-label="Clear fallback image"
+                          onClick={() => updateSelected({ fallbackArtKey: null })}
+                        >
+                          ×
+                        </button>
+                      ) : null}
+                    </div>
                   </label>
                 </div>
               </details>
@@ -972,6 +1139,7 @@ export const LayoutEditor = forwardRef<LayoutEditorHandle, LayoutEditorProps>(fu
                             node={node}
                             selectedId={selectedId}
                             assetUrls={assetUrls}
+                            orderedArtKeys={orderedArtKeys}
                             sampleRow={effectiveSampleRow}
                             setNodeRef={setNodeRef}
                             onSelect={setSelectedId}
@@ -1019,74 +1187,7 @@ export const LayoutEditor = forwardRef<LayoutEditorHandle, LayoutEditorProps>(fu
         aria-hidden={!deckPreviewOpen}
       >
         <div className="deck-filmstrip deck-filmstrip--overlay">
-          <div className="deck-filmstrip-head">
-            <span className="deck-filmstrip-title">Deck preview</span>
-            {dataSources.length > 0 && (
-              <div className="deck-filmstrip-source-picker" ref={dataSourceMenuRef}>
-                <button
-                  type="button"
-                  className="deck-filmstrip-source-btn"
-                  onClick={() => setDataSourceMenuOpen((o) => !o)}
-                  aria-haspopup="listbox"
-                  aria-expanded={dataSourceMenuOpen}
-                >
-                  <Database size={12} strokeWidth={2} aria-hidden />
-                  <span className="deck-filmstrip-source-label">
-                    {activeSource?.label ?? 'Project data'}
-                  </span>
-                  <ChevronDown
-                    size={12}
-                    strokeWidth={2}
-                    aria-hidden
-                    className={`deck-filmstrip-source-chevron${dataSourceMenuOpen ? ' deck-filmstrip-source-chevron--open' : ''}`}
-                  />
-                </button>
-                {dataSourceMenuOpen && (
-                  <ul className="deck-filmstrip-source-menu" role="listbox">
-                    <li
-                      role="option"
-                      aria-selected={!selectedDataSourceId}
-                      className={`deck-filmstrip-source-option${!selectedDataSourceId ? ' deck-filmstrip-source-option--active' : ''}`}
-                      onClick={() => {
-                        setSelectedDataSourceId(null);
-                        setDataSourceMenuOpen(false);
-                      }}
-                    >
-                      Project data
-                      <span className="deck-filmstrip-source-option-count">
-                        {deckRows.length} rows
-                      </span>
-                    </li>
-                    {dataSources
-                      .filter((s) => s.id !== '__project__')
-                      .map((s) => (
-                        <li
-                          key={s.id}
-                          role="option"
-                          aria-selected={selectedDataSourceId === s.id}
-                          className={`deck-filmstrip-source-option${selectedDataSourceId === s.id ? ' deck-filmstrip-source-option--active' : ''}`}
-                          onClick={() => {
-                            setSelectedDataSourceId(s.id);
-                            setDataSourceMenuOpen(false);
-                          }}
-                        >
-                          {s.label}
-                          <span className="deck-filmstrip-source-option-count">
-                            {s.rows.length} rows
-                          </span>
-                        </li>
-                      ))}
-                  </ul>
-                )}
-              </div>
-            )}
-            <span className="deck-filmstrip-meta">
-              {effectiveRows.length === 0
-                ? 'No CSV rows — sample preview'
-                : `${effectiveRows.length} cards`}
-            </span>
-          </div>
-          <div className="deck-filmstrip-scroll">
+          <div className="deck-filmstrip-scroll deck-filmstrip-scroll--full">
             {filmstripRows.slice(0, 48).map((row, i) => {
               const label =
                 row.Name ||
@@ -1098,7 +1199,13 @@ export const LayoutEditor = forwardRef<LayoutEditorHandle, LayoutEditorProps>(fu
               return (
                 <div key={i} className="deck-filmstrip-item" title={String(label)}>
                   <div className="deck-filmstrip-thumb">
-                    <CardFace state={state} row={row} assetUrls={assetUrls} pixelWidth={72} />
+                    <CardFace
+                      state={state}
+                      row={row}
+                      assetUrls={assetUrls}
+                      assetResolveOrder={orderedArtKeys}
+                      pixelWidth={72}
+                    />
                   </div>
                 </div>
               );
@@ -1108,15 +1215,52 @@ export const LayoutEditor = forwardRef<LayoutEditorHandle, LayoutEditorProps>(fu
       </div>
 
       <footer className="layout-editor-status-bar">
-        <LayoutEditorFooterButton
-          edge="start"
-          aria-expanded={deckPreviewOpen}
-          aria-controls={deckDrawerId}
-          onClick={() => setDeckPreviewOpen((o) => !o)}
-        >
-          <Layers className="layout-editor-footer-icon" size={14} aria-hidden />
-          Deck preview
-        </LayoutEditorFooterButton>
+        <div className="layout-editor-footer-start-cluster">
+          <LayoutEditorFooterButton
+            edge="start"
+            aria-expanded={deckPreviewOpen}
+            aria-controls={deckDrawerId}
+            onClick={() => setDeckPreviewOpen((o) => !o)}
+          >
+            <Layers className="layout-editor-footer-icon" size={14} aria-hidden />
+            Deck preview
+          </LayoutEditorFooterButton>
+          <div className="layout-editor-footer-popover" ref={previewSourceMenuRef}>
+            <LayoutEditorFooterButton
+              className="layout-editor-footer-preview-source-btn"
+              aria-haspopup="listbox"
+              aria-expanded={previewSourceMenuOpen}
+              title="Choose dataset for deck preview"
+              onClick={() => setPreviewSourceMenuOpen((o) => !o)}
+            >
+              <Table2 className="layout-editor-footer-icon" size={14} strokeWidth={2} aria-hidden />
+              <span className="layout-editor-footer-preview-source-label">
+                {activePreviewOption?.label ?? 'Preview'}
+              </span>
+            </LayoutEditorFooterButton>
+            {previewSourceMenuOpen && (
+              <ul className="deck-preview-source-popover" role="listbox">
+                {deckPreviewOptions.map((opt) => (
+                  <li
+                    key={opt.id}
+                    role="option"
+                    aria-selected={previewSourceId === opt.id}
+                    className={`deck-filmstrip-source-option${previewSourceId === opt.id ? ' deck-filmstrip-source-option--active' : ''}`}
+                    onClick={() => {
+                      setPreviewSourceId(opt.id);
+                      setPreviewSourceMenuOpen(false);
+                    }}
+                  >
+                    {opt.label}
+                    <span className="deck-filmstrip-source-option-count">
+                      {opt.rows.length === 0 ? '—' : `${opt.rows.length} cards`}
+                    </span>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </div>
+        </div>
         <div className="layout-editor-status-bar-card" aria-label="Card size and background">
           <LayoutEditorFooterValueStrip prefix="W">
             <input
@@ -1219,6 +1363,53 @@ export const LayoutEditor = forwardRef<LayoutEditorHandle, LayoutEditorProps>(fu
           </LayoutEditorFooterButton>
         </div>
       </footer>
+
+      {assetPickerOpen && projectId && token && (
+        <div
+          className="layout-asset-picker-backdrop"
+          role="presentation"
+          onClick={() => setAssetPickerOpen(false)}
+        >
+          <div
+            className="layout-asset-picker-dialog"
+            role="dialog"
+            aria-modal="true"
+            aria-label="Choose fallback image"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="layout-asset-picker-head">
+              <h2 className="layout-asset-picker-title">Choose asset</h2>
+              <button
+                type="button"
+                className="layout-asset-picker-close"
+                aria-label="Close"
+                onClick={() => setAssetPickerOpen(false)}
+              >
+                <X size={18} aria-hidden />
+              </button>
+            </div>
+            <div className="layout-asset-picker-body">
+              <AssetsTabPanel
+                projectId={projectId}
+                token={token}
+                busy={false}
+                projectAssets={projectAssets}
+                globalAssets={globalAssets}
+                layoutsFull={layoutsFull}
+                onRefresh={() => onStudioAssetsRefresh?.()}
+                onError={(msg) => {
+                  if (msg) console.warn('[AssetsPicker]', msg);
+                }}
+                artPickerMode
+                onArtKeyPicked={(artKey) => {
+                  updateSelected({ fallbackArtKey: artKey });
+                  setAssetPickerOpen(false);
+                }}
+              />
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 });

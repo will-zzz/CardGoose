@@ -15,7 +15,24 @@ model User {
   createdAt DateTime  @default(now()) @map("created_at")
   updatedAt DateTime  @updatedAt @map("updated_at")
 
-  projects Project[]
+  projects     Project[]
+  globalAssets GlobalAsset[]
+}
+
+/// User-wide images; project assets with the same normalized art key shadow these.
+model GlobalAsset {
+  id        String   @id @default(uuid()) @db.Uuid
+  userId    String   @map("user_id") @db.Uuid
+  artKey    String   @map("art_key")
+  s3Key     String   @map("s3_key")
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, artKey])
+  @@index([userId])
+  @@map("global_assets")
 }
 
 /// Optional CSV dataset: { "headers": string[], "rows": Record<string,string>[] }

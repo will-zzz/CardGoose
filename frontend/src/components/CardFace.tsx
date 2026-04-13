@@ -2,6 +2,7 @@ import { memo, type Ref } from 'react';
 import type { Layer as KonvaLayer } from 'konva/lib/Layer';
 import { Group as KonvaGroup, Image as KonvaImage, Layer, Rect, Stage, Text } from 'react-konva';
 import type { LayoutElement, LayoutStateV2 } from '../types/layout';
+import { smartResolveLayoutImageUrl } from '../lib/assetResolve';
 import { applyTemplate } from '../lib/template';
 import { isVisible } from '../lib/layoutTree';
 import { useImageElement } from './useImageElement';
@@ -47,12 +48,16 @@ function TextEl({
 
 function ImageEl({
   el,
+  row,
   assetUrls,
+  assetResolveOrder,
 }: {
   el: Extract<LayoutElement, { type: 'image' }>;
+  row: Record<string, string>;
   assetUrls: Record<string, string>;
+  assetResolveOrder: string[];
 }) {
-  const url = assetUrls[el.artKey];
+  const url = smartResolveLayoutImageUrl(el, row, assetUrls, assetResolveOrder);
   const img = useImageElement(url);
   if (!img) {
     return (
@@ -84,15 +89,17 @@ function CardNode({
   node,
   row,
   assetUrls,
+  assetResolveOrder,
 }: {
   node: LayoutElement;
   row: Record<string, string>;
   assetUrls: Record<string, string>;
+  assetResolveOrder: string[];
 }) {
   if (!isVisible(node)) return null;
   if (node.type === 'rect') return <RectEl el={node} />;
   if (node.type === 'text') return <TextEl el={node} row={row} />;
-  return <ImageEl el={node} assetUrls={assetUrls} />;
+  return <ImageEl el={node} row={row} assetUrls={assetUrls} assetResolveOrder={assetResolveOrder} />;
 }
 
 function rowDataEqual(a: Record<string, string>, b: Record<string, string>): boolean {
@@ -109,12 +116,21 @@ type CardFaceProps = {
   state: LayoutStateV2;
   row: Record<string, string>;
   assetUrls: Record<string, string>;
+  /** Project art keys first, then global — used for fuzzy cell→asset matching. */
+  assetResolveOrder?: string[];
   pixelWidth: number;
   /** For headless export: observe draw completion */
   layerRef?: Ref<KonvaLayer>;
 };
 
-function CardFaceInner({ state, row, assetUrls, pixelWidth, layerRef }: CardFaceProps) {
+function CardFaceInner({
+  state,
+  row,
+  assetUrls,
+  assetResolveOrder = [],
+  pixelWidth,
+  layerRef,
+}: CardFaceProps) {
   const scale = pixelWidth / state.width;
   const pixelHeight = state.height * scale;
   const bg = state.background ?? '#1e1e24';
@@ -125,7 +141,13 @@ function CardFaceInner({ state, row, assetUrls, pixelWidth, layerRef }: CardFace
         <KonvaGroup scaleX={scale} scaleY={scale}>
           <Rect width={state.width} height={state.height} fill={bg} />
           {state.root.map((node) => (
-            <CardNode key={node.id} node={node} row={row} assetUrls={assetUrls} />
+            <CardNode
+              key={node.id}
+              node={node}
+              row={row}
+              assetUrls={assetUrls}
+              assetResolveOrder={assetResolveOrder}
+            />
           ))}
         </KonvaGroup>
       </Layer>
@@ -139,6 +161,7 @@ export const CardFace = memo(CardFaceInner, (prev, next) => {
     prev.state === next.state &&
     prev.layerRef === next.layerRef &&
     prev.assetUrls === next.assetUrls &&
+    prev.assetResolveOrder === next.assetResolveOrder &&
     rowDataEqual(prev.row, next.row)
   );
 });

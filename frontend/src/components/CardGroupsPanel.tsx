@@ -88,9 +88,12 @@ export function CardGroupsPanel(props: {
   token: string | null;
   layoutsFull: LayoutFull[];
   assetUrls: Record<string, string>;
-  projectCsvSourceUrl: string | null;
+  /** Project art keys first, then global — for layout image fuzzy matching in previews. */
+  assetResolveOrder?: string[];
   /** Project-wide busy (e.g. layout save); card-group mutations use internal state so previews don’t thrash. */
   busy: boolean;
+  /** Fired when group list implies at least one published CSV URL (for studio chrome). */
+  onAnyPublishedUrlChange?: (hasAny: boolean) => void;
   onError: (msg: string | null) => void;
   onOpenLayoutInEditor: (layoutId: string) => void;
 }) {
@@ -99,8 +102,9 @@ export function CardGroupsPanel(props: {
     token,
     layoutsFull,
     assetUrls,
-    projectCsvSourceUrl,
+    assetResolveOrder = [],
     busy,
+    onAnyPublishedUrlChange,
     onError,
     onOpenLayoutInEditor,
   } = props;
@@ -139,6 +143,10 @@ export function CardGroupsPanel(props: {
   useEffect(() => {
     void loadGroups();
   }, [loadGroups]);
+
+  useEffect(() => {
+    onAnyPublishedUrlChange?.(groups.some((g) => Boolean(g.csvSourceUrl?.trim())));
+  }, [groups, onAnyPublishedUrlChange]);
 
   useEffect(() => {
     if (editingTitleId && titleInputRef.current) {
@@ -482,21 +490,6 @@ export function CardGroupsPanel(props: {
                             }}
                           />
                         </label>
-                        {projectCsvSourceUrl ? (
-                          <button
-                            type="button"
-                            className="card-group-url-drawer-shortcut"
-                            disabled={opsBusy}
-                            onClick={() => {
-                              void (async () => {
-                                await updateGroup(g.id, { csvSourceUrl: projectCsvSourceUrl });
-                                setDataSourceMenuGroupId(null);
-                              })();
-                            }}
-                          >
-                            Use project Data tab URL
-                          </button>
-                        ) : null}
                         <div className="card-group-url-drawer-actions">
                           <button
                             type="button"
@@ -596,6 +589,7 @@ export function CardGroupsPanel(props: {
                                   state={previewState}
                                   row={row}
                                   assetUrls={assetUrls}
+                                  assetResolveOrder={assetResolveOrder}
                                   pixelWidth={112}
                                 />
                               </div>

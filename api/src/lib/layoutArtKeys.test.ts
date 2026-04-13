@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { collectArtKeysFromLayoutState } from './layoutArtKeys.js';
+import { collectArtKeysFromLayoutState, collectPdfPrefetchArtKeys } from './layoutArtKeys.js';
 
 describe('collectArtKeysFromLayoutState', () => {
   it('collects image art keys from v2 root', () => {
@@ -58,5 +58,53 @@ describe('collectArtKeysFromLayoutState', () => {
       root: [{ type: 'image', id: 'i', x: 0, y: 0, width: 1, height: 1, artKey: '  art  ' }],
     });
     expect(keys).toEqual(['art']);
+  });
+
+  it('collects fallback art key', () => {
+    const keys = collectArtKeysFromLayoutState({
+      root: [
+        {
+          type: 'image',
+          id: 'i',
+          x: 0,
+          y: 0,
+          width: 1,
+          height: 1,
+          artKey: 'hero',
+          fallbackArtKey: 'backup.png',
+        },
+      ],
+    });
+    expect(keys.sort()).toEqual(['backup.png', 'hero'].sort());
+  });
+});
+
+describe('collectPdfPrefetchArtKeys', () => {
+  it('adds dynamic column cell values', () => {
+    const layout = {
+      version: 2,
+      width: 10,
+      height: 10,
+      root: [
+        {
+          type: 'image',
+          id: 'i',
+          x: 0,
+          y: 0,
+          width: 1,
+          height: 1,
+          artKey: 'x',
+          dynamicSourceColumn: 'Photo',
+        },
+      ],
+    };
+    const rows = [
+      { Photo: ' a.png ', Name: 'A' },
+      { Photo: 'b.png', Name: 'B' },
+    ];
+    const keys = collectPdfPrefetchArtKeys(layout, rows);
+    expect(keys).toContain('x');
+    expect(keys).toContain('a.png');
+    expect(keys).toContain('b.png');
   });
 });

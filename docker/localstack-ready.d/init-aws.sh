@@ -20,4 +20,24 @@ fi
 "${AWS[@]}" s3 mb "s3://cardgoose-exports" 2>/dev/null || true
 "${AWS[@]}" sqs create-queue --queue-name cardgoose-pdf-generation 2>/dev/null || true
 
+# Browser (Vite) loads presigned URLs with crossOrigin=anonymous → needs ACAO on GET.
+CORS_JSON="$(mktemp)"
+trap 'rm -f "$CORS_JSON"' EXIT
+cat >"$CORS_JSON" <<'EOF'
+{
+  "CORSRules": [
+    {
+      "AllowedHeaders": ["*"],
+      "AllowedMethods": ["GET", "HEAD", "PUT", "POST"],
+      "AllowedOrigins": ["*"],
+      "ExposeHeaders": ["ETag"],
+      "MaxAgeSeconds": 3000
+    }
+  ]
+}
+EOF
+for b in cardgoose-assets cardgoose-exports; do
+  "${AWS[@]}" s3api put-bucket-cors --bucket "$b" --cors-configuration "file://$CORS_JSON" 2>/dev/null || true
+done
+
 echo "LocalStack bootstrap: S3 buckets + SQS queue ready"

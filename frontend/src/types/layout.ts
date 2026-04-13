@@ -25,7 +25,12 @@ export type LayoutImage = LayoutLeafFlags & {
   y: number;
   width: number;
   height: number;
+  /** Legacy template (e.g. {{Column}}); used when dynamicSourceColumn is not set. */
   artKey: string;
+  /** CSV column header: cell value is resolved to an asset (project, then global, fuzzy). */
+  dynamicSourceColumn?: string | null;
+  /** Static art key when the dynamic cell is empty or resolution fails. */
+  fallbackArtKey?: string | null;
 };
 
 export type LayoutRect = LayoutLeafFlags & {
@@ -96,7 +101,7 @@ export function defaultLayoutState(): LayoutStateV2 {
     width: 250,
     height: 350,
     background: '#1e1e24',
-    showGrid: true,
+    showGrid: false,
     root: [
       {
         type: 'text',
@@ -126,7 +131,7 @@ function migrateV1ToV2(v1: LayoutStateV1): LayoutStateV2 {
     width: v1.width,
     height: v1.height,
     background: v1.background,
-    showGrid: true,
+    showGrid: false,
     root,
   };
 }

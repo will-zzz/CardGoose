@@ -91,11 +91,13 @@ describe('buildPdfExportPayload', () => {
       },
     ]);
     prisma.asset.findMany.mockResolvedValueOnce([{ artKey: 'art1', s3Key: 'k1' }]);
+    prisma.globalAsset.findMany.mockResolvedValueOnce([]);
 
     const r = await buildPdfExportPayload('p', 'u', { dpi: 200 });
     if ('error' in r) throw new Error(String(r.error));
     expect(r.payload.type).toBe('export-pdf');
     expect(r.payload.dpi).toBe(200);
     expect(r.payload.assetUrls).toEqual({ art1: 'https://signed.example/asset' });
+    expect(r.payload.assetResolveOrder).toEqual(['art1']);
   });
 });

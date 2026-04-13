@@ -54,8 +54,8 @@ export function DashboardPage() {
 
   return (
     <div className="page dashboard">
-      <header className="page-header">
-        <h1>Projects</h1>
+      <h1 className="visually-hidden">Projects</h1>
+      <header className="page-header dashboard-page-toolbar">
         <form onSubmit={onCreate} className="inline-form">
           <input
             placeholder="New project name"

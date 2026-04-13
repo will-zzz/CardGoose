@@ -152,6 +152,7 @@ def render_card_pngs(payload: dict[str, Any]) -> list[bytes]:
                         "layout": layout,
                         "row": row,
                         "assetUrls": asset_urls,
+                        "assetResolveOrder": payload.get("assetResolveOrder") or [],
                         "pixelWidth": pixel_w,
                     }
                     max_attempts = 3
