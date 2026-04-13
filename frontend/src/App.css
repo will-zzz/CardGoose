@@ -80,7 +80,8 @@ body.layout-editor-open .main.main-wide {
 
 /* Cards tab: sit closer to the studio nav */
 .main-wide:has(.cards-tab-section),
-.main-wide:has(.layouts-tab-section) {
+.main-wide:has(.layouts-tab-section),
+.main-wide:has(.assets-dam) {
   padding-top: 10px;
 }
 
@@ -584,7 +585,7 @@ button[type='submit']:not(.auth-primary),
     .card-group-meta-chip
   ):not(.card-group-icon-btn):not(.card-group-add-slot):not(.card-group-title-hit):not(
     .card-group-url-drawer-save
-  ):not(.card-group-url-drawer-cancel):not(.card-group-url-drawer-shortcut):not(
+  ):not(.card-group-url-drawer-cancel):not(
     .layout-list-row-hit
   ) {
   padding: 10px 14px;
@@ -1815,17 +1816,6 @@ button.zone-row-body:hover {
   text-align: left;
 }
 
-.card-group-url-drawer-shortcut {
-  align-self: flex-start;
-  padding: 4px 10px;
-  border-radius: 6px;
-  border: 1px solid rgba(16, 185, 129, 0.35);
-  background: rgba(16, 185, 129, 0.08);
-  color: #a7f3d0;
-  font-size: 12px;
-  cursor: pointer;
-}
-
 .card-group-url-drawer-actions {
   display: flex;
   flex-wrap: wrap;
@@ -2895,6 +2885,290 @@ button.zone-tool--icon {
 
 button.zone-tool--icon:hover:not(:disabled) {
   color: var(--accent);
+}
+
+/* —— Project dataset (Cards tab) —— */
+.project-dataset-panel {
+  margin-bottom: 8px;
+}
+
+.project-dataset-title {
+  margin-top: 0;
+}
+
+/* —— Assets DAM tab —— */
+.assets-dam {
+  display: grid;
+  grid-template-columns: 220px minmax(0, 1fr) 280px;
+  gap: 0;
+  min-height: min(72vh, 640px);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  overflow: hidden;
+  background: var(--panel);
+}
+
+.assets-dam-sidebar {
+  border-right: 1px solid var(--border);
+  padding: 12px 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  background: rgba(0, 0, 0, 0.15);
+}
+
+.assets-dam-sidebar-head {
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--text);
+  opacity: 0.75;
+  margin-bottom: 6px;
+}
+
+.assets-dam-tree-item {
+  text-align: left;
+  width: 100%;
+  padding: 8px 10px;
+  border: none;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--text-h);
+  font: inherit;
+  font-size: 13px;
+  cursor: pointer;
+}
+
+.assets-dam-tree-item:hover {
+  background: rgba(255, 255, 255, 0.05);
+}
+
+.assets-dam-tree-item--active {
+  background: rgba(16, 185, 129, 0.12);
+  color: #a7f3d0;
+}
+
+.assets-dam-tree-muted {
+  font-size: 11px;
+  color: var(--text);
+  opacity: 0.55;
+  padding: 4px 10px 0;
+}
+
+.assets-dam-sidebar-actions {
+  margin-top: auto;
+  padding-top: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  font-size: 12px;
+}
+
+.assets-dam-toggle {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--text);
+  cursor: pointer;
+}
+
+.assets-dam-gallery {
+  padding: 12px 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  min-width: 0;
+}
+
+.assets-dam-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+  justify-content: space-between;
+}
+
+.assets-dam-toolbar-right {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+
+.assets-dam-search {
+  flex: 1;
+  min-width: 160px;
+  max-width: 420px;
+  padding: 8px 10px;
+  border-radius: 8px;
+  border: 1px solid var(--border);
+  background: rgba(0, 0, 0, 0.2);
+  color: var(--text-h);
+  font: inherit;
+  font-size: 13px;
+}
+
+.assets-dam-chip {
+  padding: 4px 10px;
+  border-radius: 999px;
+  border: 1px solid var(--border);
+  background: transparent;
+  color: var(--text);
+  font: inherit;
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.assets-dam-chip--on {
+  border-color: var(--accent);
+  color: #a7f3d0;
+  background: rgba(16, 185, 129, 0.1);
+}
+
+.assets-dam-drop-hint {
+  margin: 0;
+  font-size: 12px;
+}
+
+.assets-dam-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(108px, 1fr));
+  gap: 10px;
+  align-content: start;
+}
+
+.assets-dam-cell {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 0;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: rgba(0, 0, 0, 0.2);
+  cursor: pointer;
+  text-align: left;
+  overflow: hidden;
+}
+
+.assets-dam-cell--selected {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+}
+
+.assets-dam-thumb {
+  width: 100%;
+  background: #121218;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+}
+
+.assets-dam-thumb--square {
+  aspect-ratio: 1 / 1;
+}
+
+.assets-dam-thumb--card {
+  aspect-ratio: 63 / 88;
+}
+
+.assets-dam-thumb img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.assets-dam-cell-label {
+  font-size: 11px;
+  padding: 0 8px 8px;
+  color: var(--text-h);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.assets-dam-inspector {
+  border-left: 1px solid var(--border);
+  padding: 12px 12px 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  background: rgba(0, 0, 0, 0.12);
+  min-width: 0;
+}
+
+.assets-dam-inspector-head {
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--text);
+  opacity: 0.75;
+}
+
+.assets-dam-preview {
+  border-radius: 8px;
+  overflow: hidden;
+  border: 1px solid var(--border);
+  background: #0f0f12;
+  min-height: 120px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.assets-dam-preview-img {
+  width: 100%;
+  max-height: 200px;
+  object-fit: contain;
+}
+
+.assets-dam-promote {
+  padding: 10px 12px;
+  border-radius: 8px;
+  border: 1px solid var(--accent);
+  background: rgba(16, 185, 129, 0.12);
+  color: #a7f3d0;
+  font: inherit;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.assets-dam-promote:hover:not(:disabled) {
+  background: rgba(16, 185, 129, 0.2);
+}
+
+.assets-dam-usage-title {
+  margin: 8px 0 0;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-h);
+}
+
+.assets-dam-usage-list {
+  margin: 0;
+  padding-left: 18px;
+  font-size: 13px;
+  color: var(--text);
+}
+
+.mono.small {
+  font-size: 11px;
+  word-break: break-all;
+}
+
+@media (max-width: 960px) {
+  .assets-dam {
+    grid-template-columns: 1fr;
+    grid-template-rows: auto auto auto;
+  }
+
+  .assets-dam-sidebar,
+  .assets-dam-inspector {
+    border: none;
+    border-bottom: 1px solid var(--border);
+  }
 }
 
 /* —— Global toasts (bottom of viewport) —— */

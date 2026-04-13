@@ -25,6 +25,7 @@ import {
 import { Layers, Minus, Plus, Table2 } from 'lucide-react';
 import type { LayoutElement, LayoutStateV2 } from '../types/layout';
 import { DEFAULT_NEW_TEXT } from '../types/layout';
+import { resolveImageUrlFromLookup } from '../lib/assetResolve';
 import { applyTemplate } from '../lib/template';
 import { CardFace } from './CardFace';
 import { useImageElement } from './useImageElement';
@@ -153,6 +154,7 @@ function TextEditorBlock({
 
 function ImageShape({
   el,
+  sampleRow,
   assetUrls,
   selected,
   setNodeRef,
@@ -161,6 +163,7 @@ function ImageShape({
   onTransformEnd,
 }: {
   el: Extract<LayoutElement, { type: 'image' }>;
+  sampleRow: Record<string, string>;
   assetUrls: Record<string, string>;
   selected: boolean;
   setNodeRef: (id: string, node: Konva.Node | null) => void;
@@ -168,7 +171,7 @@ function ImageShape({
   onDragEnd: (e: KonvaEventObject<DragEvent>) => void;
   onTransformEnd: (e: KonvaEventObject<Event>) => void;
 }) {
-  const url = assetUrls[el.artKey];
+  const url = resolveImageUrlFromLookup(el.artKey, sampleRow, assetUrls);
   const img = useImageElement(url);
   const common = {
     id: el.id,
@@ -309,6 +312,7 @@ function EditorNode({
   return (
     <ImageShape
       el={node}
+      sampleRow={sampleRow}
       assetUrls={assetUrls}
       selected={sel}
       setNodeRef={setNodeRef}
@@ -891,6 +895,7 @@ export const LayoutEditor = forwardRef<LayoutEditorHandle, LayoutEditorProps>(fu
                     Art key
                     <input
                       type="text"
+                      placeholder="e.g. art or {{Image_Column}}"
                       value={selected.artKey}
                       onChange={(e) => updateSelected({ artKey: e.target.value.trim() || 'art' })}
                     />

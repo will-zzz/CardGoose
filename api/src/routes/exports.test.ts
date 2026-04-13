@@ -50,6 +50,7 @@ function authed() {
 describe('exports routes', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    prisma.globalAsset.findMany.mockResolvedValue([]);
   });
 
   it('POST /export enqueues', async () => {

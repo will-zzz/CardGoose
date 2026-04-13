@@ -1,4 +1,5 @@
 import {
+  CopyObjectCommand,
   CreateBucketCommand,
   GetObjectCommand,
   HeadBucketCommand,
@@ -76,6 +77,22 @@ export async function putObject(
       Key: key,
       Body: body,
       ContentType: contentType,
+    })
+  );
+}
+
+/** Server-side copy within the same bucket (e.g. promote project asset → global). */
+export async function copyObjectSameBucket(
+  bucket: string,
+  sourceKey: string,
+  destKey: string
+): Promise<void> {
+  const copySource = `${bucket}/${sourceKey.split('/').map(encodeURIComponent).join('/')}`;
+  await s3Client.send(
+    new CopyObjectCommand({
+      Bucket: bucket,
+      CopySource: copySource,
+      Key: destKey,
     })
   );
 }

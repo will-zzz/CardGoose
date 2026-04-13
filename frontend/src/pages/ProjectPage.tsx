@@ -1,10 +1,12 @@
-import { useCallback, useEffect, useMemo, useRef, useState, type FormEvent } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate, useParams, useSearchParams } from 'react-router-dom';
-import { apiBase, apiJson } from '../lib/api';
+import { apiJson } from '../lib/api';
 import { useAuth } from '../contexts/useAuth';
 import { useToast } from '../contexts/useToast';
-import { parseCsvText } from '../lib/csv';
+import { buildMergedAssetUrlRecord } from '../lib/assetResolve';
+import { AssetsTabPanel } from '../components/AssetsTabPanel';
 import { CardGroupsPanel } from '../components/CardGroupsPanel';
+import { ExportTabPanel } from '../components/ExportTabPanel';
 import { LayoutsListPanel } from '../components/LayoutsListPanel';
 import {
   LayoutEditor,
@@ -56,15 +58,11 @@ export function ProjectPage() {
   const [activeLayoutId, setActiveLayoutId] = useState<string | null>(null);
   const [editorState, setEditorState] = useState<LayoutStateV2>(defaultLayoutState());
   const [layoutName, setLayoutName] = useState('Default');
-  const [assetUrls, setAssetUrls] = useState<Record<string, string>>({});
   const [assets, setAssets] = useState<Asset[]>([]);
+  const [globalAssets, setGlobalAssets] = useState<Asset[]>([]);
   const [exports, setExports] = useState<ExportRow[]>([]);
-  const [artKey, setArtKey] = useState('');
-  const [file, setFile] = useState<File | null>(null);
-  const [csvFile, setCsvFile] = useState<File | null>(null);
-  const [csvUrlDraft, setCsvUrlDraft] = useState('');
   const [busy, setBusy] = useState(false);
-  /** Pipeline tab: PDF export bypasses SQS and can take a while */
+  /** Export tab: PDF export bypasses SQS and can take a while */
   const [exportPdfLoading, setExportPdfLoading] = useState(false);
   const [exportPdfStatus, setExportPdfStatus] = useState<string | null>(null);
   /** Raster DPI for PDF cards (API clamps 150–300) */
@@ -78,9 +76,16 @@ export function ProjectPage() {
   const [lastSavedAt, setLastSavedAt] = useState<Date | null>(null);
 
   const [cardGroups, setCardGroups] = useState<CardGroupSummary[]>([]);
+  /** Kept in sync from CardGroupsPanel so app bar “Linked” reflects group URLs, not only project.csvSourceUrl */
+  const [anyCardGroupPublishedUrl, setAnyCardGroupPublishedUrl] = useState(false);
 
   const csvData = project?.csvData ?? null;
   const sampleRow = useMemo(() => csvData?.rows[0] ?? {}, [csvData]);
+
+  const mergedAssetUrls = useMemo(
+    () => buildMergedAssetUrlRecord(assets, globalAssets),
+    [assets, globalAssets]
+  );
 
   const deckPreviewOptions = useMemo((): DeckPreviewOption[] => {
     const out: DeckPreviewOption[] = [];
@@ -109,15 +114,13 @@ export function ProjectPage() {
   const loadPipeline = useCallback(async () => {
     if (!token || !id) return;
     const [a, e] = await Promise.all([
-      apiJson<{ assets: Asset[] }>(`/api/projects/${id}/assets?includeUrls=1`, { token }),
+      apiJson<{ assets: Asset[]; globalAssets: Asset[] }>(`/api/projects/${id}/assets?includeUrls=1`, {
+        token,
+      }),
       apiJson<{ exports: ExportRow[] }>(`/api/projects/${id}/exports`, { token }),
     ]);
     setAssets(a.assets);
-    const map: Record<string, string> = {};
-    for (const x of a.assets) {
-      if (x.url) map[x.artKey] = x.url;
-    }
-    setAssetUrls(map);
+    setGlobalAssets(a.globalAssets ?? []);
     setExports(e.exports);
   }, [token, id]);
 
@@ -130,6 +133,7 @@ export function ProjectPage() {
           name: string;
           csvData: CsvData | null;
           layoutId: string | null;
+          csvSourceUrl?: string | null;
         }[];
       }>(`/api/projects/${id}/card-groups`, { token });
       setCardGroups(
@@ -139,6 +143,9 @@ export function ProjectPage() {
           csvData: g.csvData,
           layoutId: g.layoutId ?? null,
         }))
+      );
+      setAnyCardGroupPublishedUrl(
+        res.cardGroups.some((g) => Boolean(g.csvSourceUrl?.trim()))
       );
     } catch {
       // non-critical for layout editor; card groups just won't appear as data sources
@@ -152,7 +159,6 @@ export function ProjectPage() {
       apiJson<{ layouts: LayoutFull[] }>(`/api/projects/${id}/layouts`, { token }),
     ]);
     setProject(proj.project);
-    setCsvUrlDraft(proj.project.csvSourceUrl ?? '');
     let list = lays.layouts;
     if (list.length === 0) {
       const created = await apiJson<{ layout: LayoutFull }>(`/api/projects/${id}/layouts`, {
@@ -176,6 +182,10 @@ export function ProjectPage() {
   useEffect(() => {
     void loadCore().catch((err) => showError(err instanceof Error ? err.message : 'Load failed'));
   }, [loadCore, showError]);
+
+  useEffect(() => {
+    setAnyCardGroupPublishedUrl(false);
+  }, [id]);
 
   useEffect(() => {
     if (tab === 'layout') {
@@ -389,8 +399,10 @@ export function ProjectPage() {
   );
 
   useEffect(() => {
-    const t = searchParams.get('tab');
-    if (t === 'cards' || t === 'layout' || t === 'layouts' || t === 'data' || t === 'pipeline') {
+    let t = searchParams.get('tab');
+    if (t === 'pipeline') t = 'export';
+    if (t === 'data') t = 'cards';
+    if (t === 'cards' || t === 'layout' || t === 'layouts' || t === 'assets' || t === 'export') {
       setTab(t);
     }
   }, [searchParams]);
@@ -404,12 +416,21 @@ export function ProjectPage() {
       projectId: id,
       projectName: project.name,
       tab,
-      hasPublishedSheet: Boolean(project.csvSourceUrl?.trim()),
+      hasPublishedSheet:
+        Boolean(project.csvSourceUrl?.trim()) || anyCardGroupPublishedUrl,
       navigateTab,
       onNavigateHomeClick,
     });
     return () => setProjectViewNav(null);
-  }, [id, project, tab, navigateTab, onNavigateHomeClick, setProjectViewNav]);
+  }, [
+    id,
+    project,
+    anyCardGroupPublishedUrl,
+    tab,
+    navigateTab,
+    onNavigateHomeClick,
+    setProjectViewNav,
+  ]);
 
   const onNavigateToProjectCardsClick = useCallback(
     (e: React.MouseEvent<HTMLAnchorElement>) => {
@@ -486,118 +507,6 @@ export function ProjectPage() {
     const ok = await saveLayout();
     if (ok) navigateTab('cards');
   }, [layoutIsDirty, saveLayout, navigateTab]);
-
-  async function importCsv(e: FormEvent) {
-    e.preventDefault();
-    if (!token || !id || !csvFile) return;
-    setBusy(true);
-    try {
-      const text = await csvFile.text();
-      const parsed = parseCsvText(text);
-      if (parsed.headers.length === 0) {
-        throw new Error('CSV must include a header row');
-      }
-      const res = await apiJson<{ csvData: CsvData; csvSourceUrl?: string | null }>(
-        `/api/projects/${id}/data`,
-        {
-          method: 'PUT',
-          token,
-          body: JSON.stringify({ ...parsed, sourceUrl: null }),
-        }
-      );
-      if (project) {
-        setProject({
-          ...project,
-          csvData: res.csvData,
-          csvSourceUrl: res.csvSourceUrl ?? null,
-        });
-        setCsvUrlDraft(res.csvSourceUrl ?? '');
-      }
-      setCsvFile(null);
-    } catch (err) {
-      showError(err instanceof Error ? err.message : 'Import failed');
-    } finally {
-      setBusy(false);
-    }
-  }
-
-  async function onUpload(e: FormEvent) {
-    e.preventDefault();
-    if (!token || !id || !file) return;
-    setBusy(true);
-    try {
-      const fd = new FormData();
-      fd.append('file', file);
-      if (artKey.trim()) fd.append('artKey', artKey.trim());
-      const full = `${apiBase()}/api/projects/${id}/assets`;
-      const res = await fetch(full, {
-        method: 'POST',
-        headers: { Authorization: `Bearer ${token}` },
-        body: fd,
-      });
-      const text = await res.text();
-      const data = text ? JSON.parse(text) : null;
-      if (!res.ok) throw new Error((data as { error?: string })?.error ?? res.statusText);
-      setFile(null);
-      setArtKey('');
-      await loadPipeline();
-    } catch (err) {
-      showError(err instanceof Error ? err.message : 'Upload failed');
-    } finally {
-      setBusy(false);
-    }
-  }
-
-  async function saveCsvLink() {
-    if (!token || !id) return;
-    setBusy(true);
-    try {
-      const trimmed = csvUrlDraft.trim();
-      const { csvSourceUrl } = await apiJson<{ csvSourceUrl: string | null }>(
-        `/api/projects/${id}/csv-link`,
-        {
-          method: 'PUT',
-          token,
-          body: JSON.stringify({ url: trimmed || null }),
-        }
-      );
-      if (project) setProject({ ...project, csvSourceUrl });
-      setCsvUrlDraft(csvSourceUrl ?? '');
-    } catch (err) {
-      showError(err instanceof Error ? err.message : 'Save link failed');
-    } finally {
-      setBusy(false);
-    }
-  }
-
-  async function refreshCsvFromUrl() {
-    if (!token || !id) return;
-    setBusy(true);
-    try {
-      const res = await apiJson<{ csvData: CsvData; csvSourceUrl: string }>(
-        `/api/projects/${id}/csv/refresh`,
-        {
-          method: 'POST',
-          token,
-          body: JSON.stringify({
-            url: csvUrlDraft.trim() || undefined,
-          }),
-        }
-      );
-      if (project) {
-        setProject({
-          ...project,
-          csvData: res.csvData,
-          csvSourceUrl: res.csvSourceUrl,
-        });
-      }
-      setCsvUrlDraft(res.csvSourceUrl);
-    } catch (err) {
-      showError(err instanceof Error ? err.message : 'Refresh failed');
-    } finally {
-      setBusy(false);
-    }
-  }
 
   const onExport = useCallback(async () => {
     if (!token || !id) return;
@@ -711,18 +620,20 @@ export function ProjectPage() {
       className={`page project-dashboard${tab === 'layout' ? ' project-dashboard--layout-tab' : ''}`}
     >
       {tab === 'cards' && (
-        <section className="section cards-tab-section">
-          <CardGroupsPanel
-            projectId={id}
-            token={token}
-            layoutsFull={layoutsFull}
-            assetUrls={assetUrls}
-            projectCsvSourceUrl={project?.csvSourceUrl ?? null}
-            busy={busy}
-            onError={(msg) => msg && showError(msg)}
-            onOpenLayoutInEditor={openLayoutInEditor}
-          />
-        </section>
+        <>
+          <section className="section cards-tab-section">
+            <CardGroupsPanel
+              projectId={id}
+              token={token}
+              layoutsFull={layoutsFull}
+              assetUrls={mergedAssetUrls}
+              busy={busy}
+              onAnyPublishedUrlChange={setAnyCardGroupPublishedUrl}
+              onError={(msg) => msg && showError(msg)}
+              onOpenLayoutInEditor={openLayoutInEditor}
+            />
+          </section>
+        </>
       )}
 
       {tab === 'layouts' && (
@@ -750,7 +661,7 @@ export function ProjectPage() {
               key={`${activeLayoutId ?? 'x'}-${layoutMountNonce}`}
               state={editorState}
               onChange={setEditorState}
-              assetUrls={assetUrls}
+              assetUrls={mergedAssetUrls}
               sampleRow={sampleRow}
               deckPreviewOptions={deckPreviewOptions}
               activeLayoutId={activeLayoutId ?? undefined}
@@ -760,192 +671,29 @@ export function ProjectPage() {
         </section>
       )}
 
-      {tab === 'data' && (
-        <section className="section">
-          <h2>CSV data</h2>
-          <p className="muted" style={{ maxWidth: 560 }}>
-            Paste a <strong>published CSV link</strong> from Google Sheets (File → Share → Publish
-            to web → CSV). The API fetches it server-side so browser CORS is not an issue. Save the
-            link, then use Refresh to pull the latest rows.
-          </p>
-          <div className="stack" style={{ maxWidth: 560 }}>
-            <label>
-              Published CSV URL (https only)
-              <input
-                type="url"
-                autoComplete="off"
-                placeholder="https://docs.google.com/spreadsheets/d/.../export?format=csv&gid=..."
-                value={csvUrlDraft}
-                onChange={(e) => setCsvUrlDraft(e.target.value)}
-              />
-            </label>
-            <div className="inline-form">
-              <button type="button" disabled={busy} onClick={() => void saveCsvLink()}>
-                Save link
-              </button>
-              <button type="button" disabled={busy} onClick={() => void refreshCsvFromUrl()}>
-                Refresh data
-              </button>
-            </div>
-          </div>
-          <h3>Or upload a file</h3>
-          <form onSubmit={importCsv} className="stack" style={{ maxWidth: 480 }}>
-            <label>
-              CSV file
-              <input
-                type="file"
-                accept=".csv,text/csv"
-                onChange={(e) => setCsvFile(e.target.files?.[0] ?? null)}
-              />
-            </label>
-            <button type="submit" disabled={busy || !csvFile}>
-              Import and replace dataset
-            </button>
-          </form>
-          {csvData && csvData.headers.length > 0 && (
-            <>
-              <h3>Preview ({csvData.rows.length} rows)</h3>
-              <div className="csv-preview">
-                <table>
-                  <thead>
-                    <tr>
-                      {csvData.headers.map((h) => (
-                        <th key={h}>{h}</th>
-                      ))}
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {csvData.rows.slice(0, 12).map((row, ri) => (
-                      <tr key={ri}>
-                        {csvData.headers.map((h) => (
-                          <td key={h}>{row[h] ?? ''}</td>
-                        ))}
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-              {csvData.rows.length > 12 && (
-                <p className="muted">
-                  Showing first 12 rows. All rows are stored for card rendering.
-                </p>
-              )}
-            </>
-          )}
-        </section>
+      {tab === 'assets' && id && (
+        <AssetsTabPanel
+          projectId={id}
+          token={token}
+          busy={busy}
+          projectAssets={assets}
+          globalAssets={globalAssets}
+          layoutsFull={layoutsFull}
+          onRefresh={() => void loadPipeline()}
+          onError={(msg) => showError(msg)}
+        />
       )}
 
-      {tab === 'pipeline' && (
-        <>
-          <section className="section">
-            <h2>Upload asset</h2>
-            <form onSubmit={onUpload} className="stack">
-              <label>
-                Optional art key
-                <input
-                  value={artKey}
-                  onChange={(e) => setArtKey(e.target.value)}
-                  placeholder="e.g. card-back"
-                />
-              </label>
-              <label>
-                File
-                <input
-                  type="file"
-                  onChange={(e) => setFile(e.target.files?.[0] ?? null)}
-                  required
-                />
-              </label>
-              <button type="submit" disabled={busy}>
-                Upload to S3
-              </button>
-            </form>
-          </section>
-
-          <section className="section">
-            <h2>Assets</h2>
-            <ul>
-              {assets.map((a) => (
-                <li key={a.id}>
-                  <code>{a.artKey}</code> — <small>{a.s3Key}</small>
-                </li>
-              ))}
-            </ul>
-            {assets.length === 0 && <p className="muted">No assets yet.</p>}
-          </section>
-
-          <section className="section">
-            <h2>Export PDF</h2>
-            <p className="muted" style={{ maxWidth: 560 }}>
-              Enqueues on SQS — the request finishes quickly while a worker renders the PDF. Run{' '}
-              <code>python -m baker.main</code> (or your ECS worker) with <code>RENDER_URL</code>{' '}
-              set to this dev server.
-            </p>
-            <label className="stack" style={{ maxWidth: 360, marginBottom: 12 }}>
-              <span>
-                Export DPI: <strong>{exportPdfDpi}</strong> (higher = sharper, slower)
-              </span>
-              <input
-                type="range"
-                min={150}
-                max={300}
-                step={1}
-                value={exportPdfDpi}
-                onChange={(e) => setExportPdfDpi(Number(e.target.value))}
-                disabled={busy || exportPdfLoading}
-                aria-valuemin={150}
-                aria-valuemax={300}
-                aria-valuenow={exportPdfDpi}
-              />
-            </label>
-            <div className="inline-form" style={{ alignItems: 'center', gap: 10 }}>
-              <button
-                type="button"
-                onClick={() => void onExport()}
-                disabled={busy || exportPdfLoading}
-              >
-                {exportPdfLoading ? (
-                  <>
-                    <Loader2
-                      className="editor-save-icon-spin editor-save-loader"
-                      size={16}
-                      aria-hidden
-                      style={{ verticalAlign: 'middle', marginRight: 6 }}
-                    />
-                    Queueing…
-                  </>
-                ) : (
-                  'Export PDF'
-                )}
-              </button>
-              {exportPdfLoading && (
-                <span className="muted" aria-live="polite">
-                  Sending to queue…
-                </span>
-              )}
-            </div>
-            {exportPdfStatus && !exportPdfLoading && (
-              <p className="muted" style={{ marginTop: 8 }} aria-live="polite">
-                {exportPdfStatus}
-              </p>
-            )}
-            <h3>Exports</h3>
-            <ul>
-              {exports.map((ex) => (
-                <li key={ex.key}>
-                  <a href={ex.url} target="_blank" rel="noreferrer">
-                    {ex.key}
-                  </a>
-                </li>
-              ))}
-            </ul>
-            {exports.length === 0 && (
-              <p className="muted">
-                No exports yet — run the worker with <code>RENDER_URL</code> set, or deploy to ECS.
-              </p>
-            )}
-          </section>
-        </>
+      {tab === 'export' && (
+        <ExportTabPanel
+          busy={busy}
+          exportPdfLoading={exportPdfLoading}
+          exportPdfStatus={exportPdfStatus}
+          exportPdfDpi={exportPdfDpi}
+          onExportPdfDpiChange={setExportPdfDpi}
+          onExportPdf={() => void onExport()}
+          exports={exports}
+        />
       )}
     </div>
   );

@@ -16,6 +16,7 @@ vi.mock('../lib/s3.js', () => ({
   getAssetsBucket: () => 'assets-bucket',
   putObject: s3Mocks.putObject,
   getSignedGetUrl: s3Mocks.getSignedGetUrl,
+  copyObjectSameBucket: vi.fn(async () => {}),
 }));
 
 import { prisma } from '../test/prisma-mock.js';
@@ -33,6 +34,8 @@ describe('assets routes', () => {
   beforeEach(() => {
     s3Mocks.putObject.mockClear();
     s3Mocks.putObject.mockResolvedValue(undefined);
+    prisma.globalAsset.findMany.mockReset();
+    prisma.globalAsset.findMany.mockResolvedValue([]);
   });
 
   it('404 when project missing', async () => {
@@ -49,6 +52,7 @@ describe('assets routes', () => {
     const res = await request(app).get('/api/projects/p1/assets').set(authed());
     expect(res.status).toBe(200);
     expect(res.body.assets[0].url).toBeUndefined();
+    expect(Array.isArray(res.body.globalAssets)).toBe(true);
   });
 
   it('includes signed URLs when requested', async () => {

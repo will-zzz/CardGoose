@@ -2,6 +2,7 @@ import { memo, type Ref } from 'react';
 import type { Layer as KonvaLayer } from 'konva/lib/Layer';
 import { Group as KonvaGroup, Image as KonvaImage, Layer, Rect, Stage, Text } from 'react-konva';
 import type { LayoutElement, LayoutStateV2 } from '../types/layout';
+import { resolveImageUrlFromLookup } from '../lib/assetResolve';
 import { applyTemplate } from '../lib/template';
 import { isVisible } from '../lib/layoutTree';
 import { useImageElement } from './useImageElement';
@@ -47,12 +48,14 @@ function TextEl({
 
 function ImageEl({
   el,
+  row,
   assetUrls,
 }: {
   el: Extract<LayoutElement, { type: 'image' }>;
+  row: Record<string, string>;
   assetUrls: Record<string, string>;
 }) {
-  const url = assetUrls[el.artKey];
+  const url = resolveImageUrlFromLookup(el.artKey, row, assetUrls);
   const img = useImageElement(url);
   if (!img) {
     return (
@@ -92,7 +95,7 @@ function CardNode({
   if (!isVisible(node)) return null;
   if (node.type === 'rect') return <RectEl el={node} />;
   if (node.type === 'text') return <TextEl el={node} row={row} />;
-  return <ImageEl el={node} assetUrls={assetUrls} />;
+  return <ImageEl el={node} row={row} assetUrls={assetUrls} />;
 }
 
 function rowDataEqual(a: Record<string, string>, b: Record<string, string>): boolean {

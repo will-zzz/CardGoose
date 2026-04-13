@@ -91,6 +91,7 @@ describe('buildPdfExportPayload', () => {
       },
     ]);
     prisma.asset.findMany.mockResolvedValueOnce([{ artKey: 'art1', s3Key: 'k1' }]);
+    prisma.globalAsset.findMany.mockResolvedValueOnce([]);
 
     const r = await buildPdfExportPayload('p', 'u', { dpi: 200 });
     if ('error' in r) throw new Error(String(r.error));

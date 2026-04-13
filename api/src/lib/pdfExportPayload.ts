@@ -1,3 +1,4 @@
+import { mergeAssetS3KeysByNormalizedKey, normalizeArtLookupKey } from './assetResolve.js';
 import { prisma } from './prisma.js';
 import { collectArtKeysFromLayoutState } from './layoutArtKeys.js';
 import { getAssetsBucket, getSignedGetUrl } from './s3.js';
@@ -80,15 +81,24 @@ export async function buildPdfExportPayload(
     for (const k of collectArtKeysFromLayoutState(eg.layout)) artKeys.add(k);
   }
 
-  const assets = await prisma.asset.findMany({
-    where: { projectId, artKey: { in: [...artKeys] } },
-    select: { artKey: true, s3Key: true },
-  });
+  const [projectAssets, globalAssets] = await Promise.all([
+    prisma.asset.findMany({
+      where: { projectId },
+      select: { artKey: true, s3Key: true },
+    }),
+    prisma.globalAsset.findMany({
+      where: { userId },
+      select: { artKey: true, s3Key: true },
+    }),
+  ]);
 
+  const merged = mergeAssetS3KeysByNormalizedKey(projectAssets, globalAssets);
   const assetsBucket = getAssetsBucket();
   const assetUrls: Record<string, string> = {};
-  for (const a of assets) {
-    assetUrls[a.artKey] = await getSignedGetUrl(assetsBucket, a.s3Key, 3600);
+  for (const rk of artKeys) {
+    const sk = merged.get(normalizeArtLookupKey(rk));
+    if (!sk) continue;
+    assetUrls[rk.trim()] = await getSignedGetUrl(assetsBucket, sk, 3600);
   }
 
   const timestamp = new Date().toISOString();
