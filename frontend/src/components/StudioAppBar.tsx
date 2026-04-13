@@ -15,6 +15,21 @@ import {
 } from './ui/dropdown-menu';
 import { BrandLogo } from './BrandLogo';
 
+/** Global shell: one logo size + chevron size for all breadcrumbs */
+const STUDIO_HEADER_LOGO_PX = 28;
+const STUDIO_BC_CHEVRON_PX = 14;
+
+function BreadcrumbChevron() {
+  return (
+    <ChevronRight
+      size={STUDIO_BC_CHEVRON_PX}
+      strokeWidth={2}
+      className="studio-bc-sep"
+      aria-hidden
+    />
+  );
+}
+
 function AppMenu({
   label,
   children,
@@ -140,18 +155,24 @@ function DashboardBar() {
   const { layoutEditor } = useStudioChrome();
 
   return (
-    <header className="studio-shell-header studio-shell-header--dash" role="banner">
-      <div className="studio-shell-row">
-        <Link
-          to="/"
-          className="studio-shell-brand studio-shell-brand--mark-only"
-          onClick={(e) => layoutEditor?.onNavigateHomeClick(e)}
-          aria-label="CardGoose home"
-        >
-          <span className="studio-shell-logo" aria-hidden>
-            <BrandLogo heightPx={44} />
+    <header className="studio-shell-header" role="banner">
+      <div className="studio-shell-row studio-shell-row--primary">
+        <nav className="studio-breadcrumb" aria-label="Breadcrumb">
+          <Link
+            to="/"
+            className="studio-shell-logo-link"
+            onClick={(e) => layoutEditor?.onNavigateHomeClick(e)}
+            aria-label="CardGoose home"
+          >
+            <span className="studio-shell-logo" aria-hidden>
+              <BrandLogo heightPx={STUDIO_HEADER_LOGO_PX} />
+            </span>
+          </Link>
+          <BreadcrumbChevron />
+          <span className="studio-bc-text studio-bc-text--current" aria-current="page">
+            Projects
           </span>
-        </Link>
+        </nav>
         <div className="studio-shell-fill" aria-hidden />
         <AccountMenu />
       </div>
@@ -178,21 +199,32 @@ function ProjectTabsBar() {
   ];
 
   return (
-    <header className="studio-shell-header studio-shell-header--project" role="banner">
-      <div className="studio-shell-row studio-shell-row--project">
-        <div className="studio-shell-left">
+    <header className="studio-shell-header" role="banner">
+      <div className="studio-shell-row studio-shell-row--primary studio-shell-row--project">
+        <nav className="studio-breadcrumb studio-breadcrumb--project" aria-label="Breadcrumb">
           <Link
             to="/"
-            className="studio-shell-brand studio-shell-brand--compact"
+            className="studio-shell-logo-link"
             onClick={(e) => onNavigateHomeClick(e)}
-            aria-label="Home"
+            aria-label="CardGoose home"
           >
             <span className="studio-shell-logo" aria-hidden>
-              <BrandLogo heightPx={36} />
+              <BrandLogo heightPx={STUDIO_HEADER_LOGO_PX} />
             </span>
           </Link>
-          <span className="studio-shell-project-name">{projectName}</span>
-        </div>
+          <BreadcrumbChevron />
+          <Link to="/" className="studio-bc-text" onClick={(e) => onNavigateHomeClick(e)}>
+            Projects
+          </Link>
+          <BreadcrumbChevron />
+          <span
+            className="studio-bc-text studio-bc-text--current"
+            title={projectName}
+            aria-current="page"
+          >
+            {projectName}
+          </span>
+        </nav>
 
         <nav className="project-tabs-nav" aria-label="Project sections">
           {items.map(({ id, label }) => (
@@ -219,18 +251,23 @@ function ProjectTabsBar() {
 
 function ProjectLoadingBar() {
   return (
-    <header className="studio-shell-header studio-shell-header--project" role="banner">
-      <div className="studio-shell-row studio-shell-row--project">
-        <div className="studio-shell-left">
-          <Link to="/" className="studio-shell-brand studio-shell-brand--compact" aria-label="Home">
+    <header className="studio-shell-header" role="banner">
+      <div className="studio-shell-row studio-shell-row--primary studio-shell-row--project">
+        <nav className="studio-breadcrumb studio-breadcrumb--project" aria-label="Breadcrumb">
+          <Link to="/" className="studio-shell-logo-link" aria-label="CardGoose home">
             <span className="studio-shell-logo" aria-hidden>
-              <BrandLogo heightPx={36} />
+              <BrandLogo heightPx={STUDIO_HEADER_LOGO_PX} />
             </span>
           </Link>
-          <span className="studio-shell-project-name studio-shell-project-name--muted">
+          <BreadcrumbChevron />
+          <Link to="/" className="studio-bc-text">
+            Projects
+          </Link>
+          <BreadcrumbChevron />
+          <span className="studio-bc-text studio-bc-text--current studio-bc-text--muted">
             Loading…
           </span>
-        </div>
+        </nav>
         <div className="studio-shell-fill" aria-hidden />
         <AccountMenu />
       </div>
@@ -297,36 +334,41 @@ function EditorBar() {
 
   return (
     <header className="studio-shell-header studio-shell-header--editor" role="banner">
-      <div className="studio-shell-row studio-shell-row--editor-main">
-        <div className="editor-breadcrumb">
+      <div className="studio-shell-row studio-shell-row--primary studio-shell-row--editor-main">
+        <nav className="studio-breadcrumb studio-breadcrumb--editor" aria-label="Breadcrumb">
           <Link
             to="/"
-            className="studio-shell-brand studio-shell-brand--compact"
+            className="studio-shell-logo-link"
             onClick={(e) => le.onNavigateHomeClick(e)}
-            aria-label="Home"
+            aria-label="CardGoose home"
           >
             <span className="studio-shell-logo" aria-hidden>
-              <BrandLogo heightPx={30} />
+              <BrandLogo heightPx={STUDIO_HEADER_LOGO_PX} />
             </span>
           </Link>
-          <ChevronRight size={14} className="editor-bc-sep" aria-hidden />
+          <BreadcrumbChevron />
+          <Link to="/" className="studio-bc-text" onClick={(e) => le.onNavigateHomeClick(e)}>
+            Projects
+          </Link>
+          <BreadcrumbChevron />
           <Link
             to={`/projects/${le.projectId}?tab=cards`}
-            className="editor-bc-link"
+            className="studio-bc-text"
             onClick={(e) => le.onNavigateToProjectCardsClick(e)}
+            title={le.projectName}
           >
             {le.projectName}
           </Link>
-          <ChevronRight size={14} className="editor-bc-sep" aria-hidden />
+          <BreadcrumbChevron />
           <input
             type="text"
-            className="editor-bc-input"
+            className="studio-bc-input"
             value={le.layoutName}
             onChange={(e) => le.onLayoutNameChange(e.target.value)}
             disabled={le.busy}
             aria-label="Layout name"
           />
-        </div>
+        </nav>
 
         <div className="editor-bar-status-save">
           <div className="editor-save-status" role="status" aria-live="polite">
