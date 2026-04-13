@@ -195,6 +195,14 @@ export function ProjectPage() {
     return undefined;
   }, [tab]);
 
+  useEffect(() => {
+    if (tab === 'assets') {
+      document.body.classList.add('assets-tab-open');
+      return () => document.body.classList.remove('assets-tab-open');
+    }
+    return undefined;
+  }, [tab]);
+
   /** Card groups are edited on the Cards tab; keep layout editor preview options in sync. */
   useEffect(() => {
     if (tab !== 'layout' || !token || !id) return;
@@ -617,7 +625,7 @@ export function ProjectPage() {
 
   return (
     <div
-      className={`page project-dashboard${tab === 'layout' ? ' project-dashboard--layout-tab' : ''}`}
+      className={`page project-dashboard${tab === 'layout' ? ' project-dashboard--layout-tab' : ''}${tab === 'assets' ? ' project-dashboard--assets-tab' : ''}`}
     >
       {tab === 'cards' && (
         <>

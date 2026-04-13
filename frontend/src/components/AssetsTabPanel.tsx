@@ -1,7 +1,32 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
+import {
+  Box,
+  ChevronDown,
+  ChevronRight,
+  Folder,
+  FolderPlus,
+  Globe,
+  ImageOff,
+  LayoutTemplate,
+  Library,
+  Loader2,
+  Ratio,
+  Search,
+  Square,
+  Trash2,
+  UploadCloud,
+} from 'lucide-react';
 import { apiBase } from '../lib/api';
+import {
+  loadAssetFolderStore,
+  newFolderId,
+  saveAssetFolderStore,
+  type AssetFolderScope,
+  type AssetFolderStore,
+} from '../lib/assetFolderStorage';
 import { normalizeArtLookupKey } from '../lib/assetResolve';
 import { collectArtKeysFromLayoutState } from '../lib/layoutArtKeys';
+import { Input } from './ui/input';
 
 export type StudioAssetRow = {
   id: string;
@@ -23,9 +48,19 @@ type Props = {
   onError: (msg: string) => void;
 };
 
-type Scope = 'project' | 'global';
+type ViewKind =
+  | { kind: 'all' }
+  | { kind: 'unused' }
+  | { kind: 'folder'; folderId: string };
 
-const GLOBAL_VISIBILITY_KEY = 'cardgoose.assets.showGlobal';
+type TreeNav = {
+  scope: AssetFolderScope;
+  view: ViewKind;
+};
+
+function assignKey(scope: AssetFolderScope, assetId: string) {
+  return `${scope}:${assetId}`;
+}
 
 export function AssetsTabPanel({
   projectId,
@@ -38,30 +73,31 @@ export function AssetsTabPanel({
   onError,
 }: Props) {
   const [search, setSearch] = useState('');
-  const [scope, setScope] = useState<Scope>('project');
+  const [nav, setNav] = useState<TreeNav>({ scope: 'project', view: { kind: 'all' } });
   const [selection, setSelection] = useState<Set<string>>(new Set());
   const [lastClicked, setLastClicked] = useState<string | null>(null);
   const [thumbRatio, setThumbRatio] = useState<'square' | 'card'>('square');
-  const [showGlobal, setShowGlobal] = useState(() => {
-    try {
-      return localStorage.getItem(GLOBAL_VISIBILITY_KEY) !== '0';
-    } catch {
-      return true;
-    }
-  });
-
-  const setShowGlobalPersist = useCallback((v: boolean) => {
-    setShowGlobal(v);
-    try {
-      localStorage.setItem(GLOBAL_VISIBILITY_KEY, v ? '1' : '0');
-    } catch {
-      /* ignore */
-    }
-  }, []);
+  const [folderStore, setFolderStore] = useState<AssetFolderStore>(() =>
+    loadAssetFolderStore(projectId)
+  );
+  const [expandedLibrary, setExpandedLibrary] = useState<Set<AssetFolderScope>>(
+    () => new Set(['project', 'global'])
+  );
+  const [expandedFolders, setExpandedFolders] = useState<Set<string>>(() => new Set());
+  const [dragDepth, setDragDepth] = useState(0);
+  const [isDraggingFiles, setIsDraggingFiles] = useState(false);
 
   useEffect(() => {
-    if (!showGlobal && scope === 'global') setScope('project');
-  }, [showGlobal, scope]);
+    setFolderStore(loadAssetFolderStore(projectId));
+  }, [projectId]);
+
+  useEffect(() => {
+    saveAssetFolderStore(projectId, folderStore);
+  }, [projectId, folderStore]);
+
+  const persistFolderStore = useCallback((updater: (prev: AssetFolderStore) => AssetFolderStore) => {
+    setFolderStore(updater);
+  }, []);
 
   const filter = useCallback(
     (rows: StudioAssetRow[]) => {
@@ -95,18 +131,19 @@ export function AssetsTabPanel({
     [visibleProject, usedNormalizedKeys]
   );
 
-  const [projectFolder, setProjectFolder] = useState<'all' | 'unused'>('all');
-
-  const gridItems =
-    scope === 'project'
-      ? projectFolder === 'unused'
-        ? unusedProject
-        : visibleProject
-      : visibleGlobal;
+  const gridItems = useMemo((): StudioAssetRow[] => {
+    const base = nav.scope === 'project' ? visibleProject : visibleGlobal;
+    if (nav.view.kind === 'all') return base;
+    if (nav.view.kind === 'unused') {
+      return nav.scope === 'project' ? unusedProject : [];
+    }
+    const fid = nav.view.folderId;
+    return base.filter((a) => folderStore.assignments[assignKey(nav.scope, a.id)] === fid);
+  }, [nav, visibleProject, visibleGlobal, unusedProject, folderStore.assignments]);
 
   const toggleSelect = (asset: StudioAssetRow, e: React.MouseEvent, list: StudioAssetRow[]) => {
     e.preventDefault();
-    const prefix = scope === 'project' ? 'p' : 'g';
+    const prefix = nav.scope === 'project' ? 'p' : 'g';
     const idKey = `${prefix}:${asset.id}`;
     if (e.shiftKey && lastClicked) {
       const i0 = list.findIndex((x) => `${prefix}:${x.id}` === lastClicked);
@@ -149,8 +186,10 @@ export function AssetsTabPanel({
     return null;
   }, [selection, globalAssets]);
 
+  const selectedAsset = selectedProjectAsset ?? selectedGlobalAsset;
+
   const usageLayouts = useMemo(() => {
-    const sel = selectedProjectAsset ?? selectedGlobalAsset;
+    const sel = selectedAsset;
     if (!sel) return [];
     const nk = normalizeArtLookupKey(sel.artKey);
     const out: { id: string; name: string }[] = [];
@@ -161,9 +200,45 @@ export function AssetsTabPanel({
       }
     }
     return out;
-  }, [selectedProjectAsset, selectedGlobalAsset, layoutsFull]);
+  }, [selectedAsset, layoutsFull]);
 
-  async function uploadFiles(files: FileList | null, target: Scope) {
+  const foldersForScope = useCallback(
+    (scope: AssetFolderScope) => folderStore.folders.filter((f) => f.scope === scope),
+    [folderStore.folders]
+  );
+
+  const childFolders = useCallback(
+    (scope: AssetFolderScope, parentId: string | null) =>
+      folderStore.folders.filter((f) => f.scope === scope && f.parentId === parentId),
+    [folderStore.folders]
+  );
+
+  const setAssetFolderAssignment = useCallback(
+    (scope: AssetFolderScope, assetId: string, folderId: string | '') => {
+      const k = assignKey(scope, assetId);
+      persistFolderStore((prev) => {
+        const assignments = { ...prev.assignments };
+        if (!folderId) delete assignments[k];
+        else assignments[k] = folderId;
+        return { ...prev, assignments };
+      });
+    },
+    [persistFolderStore]
+  );
+
+  const folderOptionsForScope = useMemo(() => {
+    const scope = selectedProjectAsset ? ('project' as const) : selectedGlobalAsset ? ('global' as const) : null;
+    if (!scope) return [];
+    return foldersForScope(scope);
+  }, [selectedProjectAsset, selectedGlobalAsset, foldersForScope]);
+
+  const selectedAssetFolderId = useMemo(() => {
+    if (!selectedAsset) return '';
+    const scope: AssetFolderScope = selectedProjectAsset ? 'project' : 'global';
+    return folderStore.assignments[assignKey(scope, selectedAsset.id)] ?? '';
+  }, [selectedAsset, selectedProjectAsset, folderStore.assignments]);
+
+  async function uploadFiles(files: FileList | null, target: AssetFolderScope) {
     if (!token || !files?.length) return;
     for (const file of Array.from(files)) {
       const fd = new FormData();
@@ -238,170 +313,414 @@ export function AssetsTabPanel({
     onRefresh();
   }
 
+  const onGridDragEnter = (e: React.DragEvent) => {
+    e.preventDefault();
+    if (!e.dataTransfer.types.includes('Files')) return;
+    setDragDepth((d) => d + 1);
+    setIsDraggingFiles(true);
+  };
+
+  const onGridDragLeave = (e: React.DragEvent) => {
+    e.preventDefault();
+    setDragDepth((d) => {
+      const next = Math.max(0, d - 1);
+      if (next === 0) setIsDraggingFiles(false);
+      return next;
+    });
+  };
+
+  const onGridDragOver = (e: React.DragEvent) => {
+    e.preventDefault();
+    if (e.dataTransfer.types.includes('Files')) {
+      e.dataTransfer.dropEffect = 'copy';
+    }
+  };
+
   const onGridDrop = (e: React.DragEvent) => {
     e.preventDefault();
-    void uploadFiles(e.dataTransfer.files, scope);
+    setDragDepth(0);
+    setIsDraggingFiles(false);
+    void uploadFiles(e.dataTransfer.files, nav.scope);
+  };
+
+  const toggleLibrary = (scope: AssetFolderScope) => {
+    setExpandedLibrary((prev) => {
+      const next = new Set(prev);
+      if (next.has(scope)) next.delete(scope);
+      else next.add(scope);
+      return next;
+    });
+  };
+
+  const toggleFolderExpand = (folderId: string) => {
+    setExpandedFolders((prev) => {
+      const next = new Set(prev);
+      if (next.has(folderId)) next.delete(folderId);
+      else next.add(folderId);
+      return next;
+    });
+  };
+
+  const newFolderUnderActive = () => {
+    const name = window.prompt('Folder name', 'New folder')?.trim();
+    if (!name) return;
+    const scope = nav.scope;
+    let parentId: string | null = null;
+    if (nav.view.kind === 'folder') parentId = nav.view.folderId;
+    const id = newFolderId();
+    persistFolderStore((prev) => ({
+      ...prev,
+      folders: [...prev.folders, { id, parentId, name, scope }],
+    }));
+    setExpandedLibrary((s) => new Set(s).add(scope));
+    if (parentId) {
+      setExpandedFolders((s) => new Set(s).add(parentId));
+    }
+    setNav({ scope, view: { kind: 'folder', folderId: id } });
+  };
+
+  const renderFolderSubtree = (scope: AssetFolderScope, parentId: string | null, depth: number) => {
+    const rows = childFolders(scope, parentId)
+      .slice()
+      .sort((a, b) => a.name.localeCompare(b.name, undefined, { sensitivity: 'base' }));
+    return rows.map((f) => {
+      const isOpen = expandedFolders.has(f.id);
+      const hasChildren = childFolders(scope, f.id).length > 0;
+      const active =
+        nav.scope === scope && nav.view.kind === 'folder' && nav.view.folderId === f.id;
+      return (
+        <div key={f.id}>
+          <div
+            className={`assets-shell-tree-row${active ? ' assets-shell-tree-row--active' : ''}`}
+            style={{ paddingLeft: 8 + depth * 14 }}
+          >
+            {hasChildren ? (
+              <button
+                type="button"
+                className="assets-shell-tree-chev assets-shell-ctrl"
+                aria-expanded={isOpen}
+                aria-label={isOpen ? 'Collapse' : 'Expand'}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  toggleFolderExpand(f.id);
+                }}
+              >
+                {isOpen ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
+              </button>
+            ) : (
+              <span className="assets-shell-tree-chev-spacer" aria-hidden />
+            )}
+            <button
+              type="button"
+              className="assets-shell-tree-label assets-shell-ctrl"
+              onClick={() => setNav({ scope, view: { kind: 'folder', folderId: f.id } })}
+            >
+              <Folder size={14} className="assets-shell-tree-ico" aria-hidden />
+              <span className="assets-shell-tree-text">{f.name}</span>
+            </button>
+          </div>
+          {isOpen && hasChildren && (
+            <div>{renderFolderSubtree(scope, f.id, depth + 1)}</div>
+          )}
+        </div>
+      );
+    });
   };
 
   const thumbClass =
-    thumbRatio === 'square' ? 'assets-dam-thumb assets-dam-thumb--square' : 'assets-dam-thumb assets-dam-thumb--card';
+    thumbRatio === 'square'
+      ? 'assets-shell-thumb assets-shell-thumb--square'
+      : 'assets-shell-thumb assets-shell-thumb--card';
 
   return (
-    <div className="assets-dam">
-      <aside className="assets-dam-sidebar" aria-label="Asset folders">
-        <div className="assets-dam-sidebar-head">Library</div>
-        <button
-          type="button"
-          className={`assets-dam-tree-item${scope === 'project' ? ' assets-dam-tree-item--active' : ''}`}
-          onClick={() => setScope('project')}
-        >
-          Project assets
-        </button>
-        {showGlobal && (
+    <div className="assets-shell">
+      <aside className="assets-shell-sidebar" aria-label="Libraries and folders">
+        <div className="assets-shell-sidebar-brand">
+          <Library size={16} aria-hidden />
+          <span>Library</span>
+        </div>
+
+        <nav className="assets-shell-tree" aria-label="Folder hierarchy">
+          <div className="assets-shell-tree-block">
+            <div
+              className={`assets-shell-tree-row assets-shell-tree-row--root${nav.scope === 'project' ? ' assets-shell-tree-row--scope-on' : ''}`}
+            >
+              <button
+                type="button"
+                className="assets-shell-tree-chev assets-shell-ctrl"
+                aria-expanded={expandedLibrary.has('project')}
+                aria-label={expandedLibrary.has('project') ? 'Collapse' : 'Expand'}
+                onClick={() => toggleLibrary('project')}
+              >
+                {expandedLibrary.has('project') ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
+              </button>
+              <button
+                type="button"
+                className="assets-shell-tree-label assets-shell-ctrl"
+                onClick={() => {
+                  setNav({ scope: 'project', view: { kind: 'all' } });
+                  setExpandedLibrary((s) => new Set(s).add('project'));
+                }}
+              >
+                <Box size={14} className="assets-shell-tree-ico" aria-hidden />
+                <span className="assets-shell-tree-text">Project assets</span>
+              </button>
+            </div>
+            {expandedLibrary.has('project') && (
+              <div className="assets-shell-tree-nested">
+                <button
+                  type="button"
+                  className={`assets-shell-tree-leaf assets-shell-ctrl${nav.scope === 'project' && nav.view.kind === 'all' ? ' assets-shell-tree-row--active' : ''}`}
+                  style={{ paddingLeft: 36 }}
+                  onClick={() => setNav({ scope: 'project', view: { kind: 'all' } })}
+                >
+                  <Folder size={14} className="assets-shell-tree-ico" aria-hidden />
+                  All assets
+                </button>
+                <button
+                  type="button"
+                  className={`assets-shell-tree-leaf assets-shell-ctrl${nav.scope === 'project' && nav.view.kind === 'unused' ? ' assets-shell-tree-row--active' : ''}`}
+                  style={{ paddingLeft: 36 }}
+                  onClick={() => setNav({ scope: 'project', view: { kind: 'unused' } })}
+                >
+                  <ImageOff size={14} className="assets-shell-tree-ico" aria-hidden />
+                  Unused
+                  <span className="assets-shell-tree-count">{unusedProject.length}</span>
+                </button>
+                {renderFolderSubtree('project', null, 1)}
+              </div>
+            )}
+          </div>
+
+          <div className="assets-shell-tree-block">
+            <div
+              className={`assets-shell-tree-row assets-shell-tree-row--root${nav.scope === 'global' ? ' assets-shell-tree-row--scope-on' : ''}`}
+            >
+              <button
+                type="button"
+                className="assets-shell-tree-chev assets-shell-ctrl"
+                aria-expanded={expandedLibrary.has('global')}
+                aria-label={expandedLibrary.has('global') ? 'Collapse' : 'Expand'}
+                onClick={() => toggleLibrary('global')}
+              >
+                {expandedLibrary.has('global') ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
+              </button>
+              <button
+                type="button"
+                className="assets-shell-tree-label assets-shell-ctrl"
+                onClick={() => {
+                  setNav({ scope: 'global', view: { kind: 'all' } });
+                  setExpandedLibrary((s) => new Set(s).add('global'));
+                }}
+              >
+                <Globe size={14} className="assets-shell-tree-ico" aria-hidden />
+                <span className="assets-shell-tree-text">Global library</span>
+              </button>
+            </div>
+            {expandedLibrary.has('global') && (
+              <div className="assets-shell-tree-nested">
+                <button
+                  type="button"
+                  className={`assets-shell-tree-leaf assets-shell-ctrl${nav.scope === 'global' && nav.view.kind === 'all' ? ' assets-shell-tree-row--active' : ''}`}
+                  style={{ paddingLeft: 36 }}
+                  onClick={() => setNav({ scope: 'global', view: { kind: 'all' } })}
+                >
+                  <Folder size={14} className="assets-shell-tree-ico" aria-hidden />
+                  All assets
+                </button>
+                {renderFolderSubtree('global', null, 1)}
+              </div>
+            )}
+          </div>
+        </nav>
+
+        <div className="assets-shell-sidebar-foot">
           <button
             type="button"
-            className={`assets-dam-tree-item${scope === 'global' ? ' assets-dam-tree-item--active' : ''}`}
-            onClick={() => setScope('global')}
+            className="assets-shell-foot-btn assets-shell-ctrl"
+            onClick={newFolderUnderActive}
           >
-            Global library
-          </button>
-        )}
-        {scope === 'project' && (
-          <>
-            <button
-              type="button"
-              className={`assets-dam-tree-item${projectFolder === 'all' ? ' assets-dam-tree-item--active' : ''}`}
-              onClick={() => setProjectFolder('all')}
-            >
-              All assets
-            </button>
-            <button
-              type="button"
-              className={`assets-dam-tree-item${projectFolder === 'unused' ? ' assets-dam-tree-item--active' : ''}`}
-              onClick={() => setProjectFolder('unused')}
-            >
-              Unused ({unusedProject.length})
-            </button>
-          </>
-        )}
-        <div className="assets-dam-sidebar-actions">
-          <button type="button" className="link-btn" disabled title="Folders coming soon">
+            <FolderPlus size={14} aria-hidden />
             New folder
           </button>
-          <label className="assets-dam-toggle">
-            <input
-              type="checkbox"
-              checked={showGlobal}
-              onChange={(e) => setShowGlobalPersist(e.target.checked)}
-            />
-            Show global library
-          </label>
         </div>
       </aside>
 
-      <section
-        className="assets-dam-gallery"
-        onDragOver={(e) => e.preventDefault()}
-        onDrop={onGridDrop}
-        aria-label="Asset gallery"
-      >
-        <div className="assets-dam-toolbar">
-          <input
-            type="search"
-            className="assets-dam-search"
-            placeholder="Search by art key, filename, or path…"
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-          />
-          <div className="assets-dam-toolbar-right">
-            <span className="muted">Thumbnails</span>
+      <div className="assets-shell-center">
+        <header className="assets-shell-toolbar">
+          <div className="assets-shell-toolbar-search">
+            <Search size={15} className="assets-shell-toolbar-search-ico" aria-hidden />
+            <Input
+              type="search"
+              className="assets-shell-search-input"
+              placeholder="Search art key, filename, path…"
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              autoComplete="off"
+            />
+          </div>
+          <div className="assets-shell-toolbar-tools">
+            <span className="assets-shell-toolbar-label">Thumbnails</span>
             <button
               type="button"
-              className={thumbRatio === 'square' ? 'assets-dam-chip assets-dam-chip--on' : 'assets-dam-chip'}
+              title="Square thumbnails"
+              className={`assets-shell-tool-ico assets-shell-ctrl${thumbRatio === 'square' ? ' assets-shell-tool-ico--on' : ''}`}
               onClick={() => setThumbRatio('square')}
             >
-              Square
+              <Square size={18} strokeWidth={1.75} />
             </button>
             <button
               type="button"
-              className={thumbRatio === 'card' ? 'assets-dam-chip assets-dam-chip--on' : 'assets-dam-chip'}
+              title="Card aspect ratio"
+              className={`assets-shell-tool-ico assets-shell-ctrl${thumbRatio === 'card' ? ' assets-shell-tool-ico--on' : ''}`}
               onClick={() => setThumbRatio('card')}
             >
-              Card ratio
+              <Ratio size={18} strokeWidth={1.75} />
             </button>
-            <button type="button" disabled={selection.size === 0 || busy} onClick={() => void deleteSelected()}>
-              Delete selected
+            <span className="assets-shell-toolbar-divider" aria-hidden />
+            <button
+              type="button"
+              title="Delete selected"
+              className="assets-shell-tool-ico assets-shell-tool-ico--danger assets-shell-ctrl"
+              disabled={selection.size === 0 || busy}
+              onClick={() => void deleteSelected()}
+            >
+              <Trash2 size={18} strokeWidth={1.75} />
             </button>
           </div>
-        </div>
-        <p className="muted assets-dam-drop-hint">Drop files here to upload to the {scope} library.</p>
-        <div className="assets-dam-grid">
-          {gridItems.map((a) => {
-            const idKey = `${scope === 'project' ? 'p' : 'g'}:${a.id}`;
-            const selected = selection.has(idKey);
-            return (
-              <button
-                key={idKey}
-                type="button"
-                className={`assets-dam-cell${selected ? ' assets-dam-cell--selected' : ''}`}
-                onClick={(e) => toggleSelect(a, e, gridItems)}
-              >
-                <div className={thumbClass}>
-                  {a.url ? (
-                    <img src={a.url} alt="" loading="lazy" />
-                  ) : (
-                    <span className="muted">No preview</span>
-                  )}
-                </div>
-                <div className="assets-dam-cell-label" title={a.artKey}>
-                  {a.artKey}
-                </div>
-              </button>
-            );
-          })}
-        </div>
-        {gridItems.length === 0 && <p className="muted">No assets match this filter.</p>}
-      </section>
+        </header>
 
-      <aside className="assets-dam-inspector" aria-label="Asset details">
-        <div className="assets-dam-inspector-head">Inspector</div>
-        {!selectedProjectAsset && !selectedGlobalAsset && (
-          <p className="muted">Select an asset to preview and manage.</p>
+        <div
+          className={`assets-shell-gallery${isDraggingFiles ? ' assets-shell-gallery--drag-active' : ''}`}
+          onDragEnter={onGridDragEnter}
+          onDragLeave={onGridDragLeave}
+          onDragOver={onGridDragOver}
+          onDrop={onGridDrop}
+          role="region"
+          aria-label="Asset grid and upload drop zone"
+        >
+          {!isDraggingFiles && (
+            <p className="assets-shell-drop-ghost">
+              Drag files here to upload to the {nav.scope === 'project' ? 'project' : 'global'} library.
+            </p>
+          )}
+          {isDraggingFiles && (
+            <div className="assets-shell-drop-overlay" aria-live="polite">
+              <UploadCloud size={28} strokeWidth={1.5} aria-hidden />
+              <span>Drop to upload</span>
+            </div>
+          )}
+          <div className="assets-shell-grid">
+            {gridItems.map((a) => {
+              const idKey = `${nav.scope === 'project' ? 'p' : 'g'}:${a.id}`;
+              const selected = selection.has(idKey);
+              return (
+                <button
+                  key={idKey}
+                  type="button"
+                  className={`assets-shell-cell assets-shell-ctrl${selected ? ' assets-shell-cell--selected' : ''}`}
+                  onClick={(e) => toggleSelect(a, e, gridItems)}
+                >
+                  <div className={thumbClass}>
+                    {a.url ? <img src={a.url} alt="" loading="lazy" /> : <span className="assets-shell-no-prev">No preview</span>}
+                  </div>
+                  <div className="assets-shell-cell-label" title={a.artKey}>
+                    {a.artKey}
+                  </div>
+                </button>
+              );
+            })}
+          </div>
+          {gridItems.length === 0 && !isDraggingFiles && (
+            <p className="assets-shell-empty">
+              {nav.view.kind === 'folder'
+                ? 'This folder has no assets yet. Assign assets from the inspector, or pick another folder.'
+                : 'No assets match this view.'}
+            </p>
+          )}
+        </div>
+      </div>
+
+      <aside className="assets-shell-inspector" aria-label="Asset details">
+        <div className="assets-shell-inspector-head">
+          <LayoutTemplate size={14} aria-hidden />
+          Inspector
+        </div>
+        {!selectedAsset && (
+          <p className="assets-shell-inspector-empty">Select an asset to inspect metadata and usage.</p>
         )}
-        {(selectedProjectAsset || selectedGlobalAsset) && (
+        {selectedAsset && (
           <>
-            <div className="assets-dam-preview">
-              {(selectedProjectAsset ?? selectedGlobalAsset)?.url ? (
-                <img
-                  src={(selectedProjectAsset ?? selectedGlobalAsset)!.url}
-                  alt=""
-                  className="assets-dam-preview-img"
-                />
+            <div className="assets-shell-preview">
+              {selectedAsset.url ? (
+                <img src={selectedAsset.url} alt="" className="assets-shell-preview-img" />
               ) : (
-                <p className="muted">No signed URL</p>
+                <span className="assets-shell-no-prev">No signed URL</span>
               )}
             </div>
-            <p>
-              <strong>{(selectedProjectAsset ?? selectedGlobalAsset)!.artKey}</strong>
-            </p>
-            <p className="muted mono small">{(selectedProjectAsset ?? selectedGlobalAsset)!.s3Key}</p>
+            <div className="assets-shell-inspector-title">{selectedAsset.artKey}</div>
+            <dl className="assets-shell-meta">
+              <dt>Storage key</dt>
+              <dd className="assets-shell-meta-mono">{selectedAsset.s3Key}</dd>
+              <dt>Asset id</dt>
+              <dd className="assets-shell-meta-mono">{selectedAsset.id}</dd>
+            </dl>
+
+            {(selectedProjectAsset || selectedGlobalAsset) && (
+              <div className="assets-shell-field">
+                <label className="assets-shell-field-label" htmlFor="asset-folder-select">
+                  <Folder size={12} aria-hidden />
+                  Folder
+                </label>
+                <select
+                  id="asset-folder-select"
+                  className="assets-shell-select"
+                  value={selectedAssetFolderId}
+                  onChange={(e) => {
+                    const scope: AssetFolderScope = selectedProjectAsset ? 'project' : 'global';
+                    setAssetFolderAssignment(scope, selectedAsset.id, e.target.value);
+                  }}
+                >
+                  <option value="">Library root (unfiled)</option>
+                  {folderOptionsForScope.map((f) => (
+                    <option key={f.id} value={f.id}>
+                      {f.name}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            )}
+
             {selectedProjectAsset && (
-              <button type="button" className="assets-dam-promote" disabled={busy} onClick={() => void promoteSelected()}>
+              <button
+                type="button"
+                className="assets-shell-promote assets-shell-ctrl"
+                disabled={busy}
+                onClick={() => void promoteSelected()}
+              >
+                {busy ? <Loader2 size={16} className="assets-shell-spin" /> : <Globe size={16} aria-hidden />}
                 Make global
               </button>
             )}
-            <h4 className="assets-dam-usage-title">Used in layouts</h4>
-            {usageLayouts.length === 0 ? (
-              <p className="muted">No layout image zones reference this key.</p>
-            ) : (
-              <ul className="assets-dam-usage-list">
-                {usageLayouts.map((L) => (
-                  <li key={L.id}>
-                    <span title={L.name}>{L.name}</span>
-                  </li>
-                ))}
-              </ul>
-            )}
+
+            <div className="assets-shell-usage-block">
+              <div className="assets-shell-usage-head">
+                <LayoutTemplate size={14} aria-hidden />
+                Used in layouts
+              </div>
+              {usageLayouts.length === 0 ? (
+                <p className="assets-shell-usage-empty">No layout image zones reference this art key.</p>
+              ) : (
+                <ul className="assets-shell-usage-list">
+                  {usageLayouts.map((L) => (
+                    <li key={L.id}>
+                      <LayoutTemplate size={12} className="assets-shell-usage-li-ico" aria-hidden />
+                      <span title={L.name}>{L.name}</span>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </div>
           </>
         )}
       </aside>
