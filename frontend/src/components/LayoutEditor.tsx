@@ -601,7 +601,7 @@ export const LayoutEditor = forwardRef<LayoutEditorHandle, LayoutEditorProps>(fu
   const scale = fitScale * (zoomPercent / 100);
   const stageW = state.width * scale;
   const stageH = state.height * scale;
-  const showGrid = state.showGrid !== false;
+  const showGrid = state.showGrid ?? false;
 
   const toggleVisible = (id: string) => {
     commit(

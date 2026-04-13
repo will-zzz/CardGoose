@@ -96,7 +96,7 @@ export function defaultLayoutState(): LayoutStateV2 {
     width: 250,
     height: 350,
     background: '#1e1e24',
-    showGrid: true,
+    showGrid: false,
     root: [
       {
         type: 'text',
@@ -126,7 +126,7 @@ function migrateV1ToV2(v1: LayoutStateV1): LayoutStateV2 {
     width: v1.width,
     height: v1.height,
     background: v1.background,
-    showGrid: true,
+    showGrid: false,
     root,
   };
 }
