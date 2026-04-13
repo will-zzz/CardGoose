@@ -4,6 +4,7 @@ import {
   GetObjectCommand,
   HeadBucketCommand,
   ListObjectsV2Command,
+  PutBucketCorsCommand,
   PutObjectCommand,
   S3Client,
 } from '@aws-sdk/client-s3';
@@ -42,6 +43,30 @@ export function getExportsBucket(): string {
   return b;
 }
 
+/** Presigned GET from Vite (5173) needs CORS on bucket; LocalStack default bucket has none. */
+async function ensureLocalStackBucketCors(Bucket: string): Promise<void> {
+  try {
+    await s3Client.send(
+      new PutBucketCorsCommand({
+        Bucket,
+        CORSConfiguration: {
+          CORSRules: [
+            {
+              AllowedHeaders: ['*'],
+              AllowedMethods: ['GET', 'HEAD', 'PUT', 'POST'],
+              AllowedOrigins: ['*'],
+              ExposeHeaders: ['ETag'],
+              MaxAgeSeconds: 3000,
+            },
+          ],
+        },
+      })
+    );
+  } catch (err) {
+    rootLogger.warn({ err, Bucket }, 'PutBucketCors failed (browser asset loads may break)');
+  }
+}
+
 /** After Docker/LocalStack restarts, buckets may be missing; create them in dev only. */
 export async function ensureDevLocalStackBuckets(): Promise<void> {
   const endpoint = process.env.AWS_ENDPOINT_URL ?? '';
@@ -62,6 +87,9 @@ export async function ensureDevLocalStackBuckets(): Promise<void> {
         throw err;
       }
     }
+  }
+  for (const Bucket of buckets) {
+    await ensureLocalStackBucketCors(Bucket);
   }
 }
 

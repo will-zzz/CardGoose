@@ -1,6 +1,6 @@
 import { mergeAssetS3KeysByNormalizedKey, normalizeArtLookupKey } from './assetResolve.js';
 import { prisma } from './prisma.js';
-import { collectArtKeysFromLayoutState } from './layoutArtKeys.js';
+import { collectPdfPrefetchArtKeys } from './layoutArtKeys.js';
 import { getAssetsBucket, getSignedGetUrl } from './s3.js';
 
 /** UI / server default; slider range is 150–300. */
@@ -78,7 +78,7 @@ export async function buildPdfExportPayload(
 
   const artKeys = new Set<string>();
   for (const eg of exportGroups) {
-    for (const k of collectArtKeysFromLayoutState(eg.layout)) artKeys.add(k);
+    for (const k of collectPdfPrefetchArtKeys(eg.layout, eg.rows)) artKeys.add(k);
   }
 
   const [projectAssets, globalAssets] = await Promise.all([
@@ -93,6 +93,21 @@ export async function buildPdfExportPayload(
   ]);
 
   const merged = mergeAssetS3KeysByNormalizedKey(projectAssets, globalAssets);
+  const seenOrder = new Set<string>();
+  const assetResolveOrder: string[] = [];
+  for (const a of projectAssets) {
+    const n = normalizeArtLookupKey(a.artKey);
+    if (seenOrder.has(n)) continue;
+    seenOrder.add(n);
+    assetResolveOrder.push(a.artKey);
+  }
+  for (const a of globalAssets) {
+    const n = normalizeArtLookupKey(a.artKey);
+    if (seenOrder.has(n)) continue;
+    seenOrder.add(n);
+    assetResolveOrder.push(a.artKey);
+  }
+
   const assetsBucket = getAssetsBucket();
   const assetUrls: Record<string, string> = {};
   for (const rk of artKeys) {
@@ -112,6 +127,7 @@ export async function buildPdfExportPayload(
     dpi: resolveExportPdfDpi(options?.dpi),
     groups: exportGroups,
     assetUrls,
+    assetResolveOrder,
   };
 
   return { payload, timestamp };

@@ -43,7 +43,11 @@ function contentLabel(node: LayoutElement): string {
     const t = node.text ?? '';
     return t.length > 40 ? `${t.slice(0, 40)}…` : t;
   }
-  if (node.type === 'image') return node.artKey || 'image';
+  if (node.type === 'image') {
+    const col = node.dynamicSourceColumn?.trim();
+    if (col) return `{{${col}}}`;
+    return node.fallbackArtKey || node.artKey || 'image';
+  }
   return 'Bar';
 }
 

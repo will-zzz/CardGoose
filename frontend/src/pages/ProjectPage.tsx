@@ -3,7 +3,7 @@ import { useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import { apiJson } from '../lib/api';
 import { useAuth } from '../contexts/useAuth';
 import { useToast } from '../contexts/useToast';
-import { buildMergedAssetUrlRecord } from '../lib/assetResolve';
+import { buildMergedAssetUrlRecord, normalizeArtLookupKey } from '../lib/assetResolve';
 import { AssetsTabPanel } from '../components/AssetsTabPanel';
 import { CardGroupsPanel } from '../components/CardGroupsPanel';
 import { ExportTabPanel } from '../components/ExportTabPanel';
@@ -87,6 +87,24 @@ export function ProjectPage() {
     [assets, globalAssets]
   );
 
+  const assetResolveOrder = useMemo(() => {
+    const seen = new Set<string>();
+    const out: string[] = [];
+    for (const a of assets) {
+      const n = normalizeArtLookupKey(a.artKey);
+      if (seen.has(n)) continue;
+      seen.add(n);
+      out.push(a.artKey);
+    }
+    for (const a of globalAssets) {
+      const n = normalizeArtLookupKey(a.artKey);
+      if (seen.has(n)) continue;
+      seen.add(n);
+      out.push(a.artKey);
+    }
+    return out;
+  }, [assets, globalAssets]);
+
   const deckPreviewOptions = useMemo((): DeckPreviewOption[] => {
     const out: DeckPreviewOption[] = [];
     if (csvData && csvData.rows.length > 0) {
@@ -94,14 +112,17 @@ export function ProjectPage() {
         id: '__project__',
         label: 'Project dataset',
         rows: csvData.rows,
+        headers: csvData.headers,
         layoutId: null,
       });
     }
     for (const g of cardGroups) {
+      const csv = g.csvData;
       out.push({
         id: g.id,
         label: g.name,
-        rows: g.csvData?.rows ?? [],
+        rows: csv?.rows ?? [],
+        headers: csv?.headers,
         layoutId: g.layoutId,
       });
     }
@@ -635,6 +656,7 @@ export function ProjectPage() {
               token={token}
               layoutsFull={layoutsFull}
               assetUrls={mergedAssetUrls}
+              assetResolveOrder={assetResolveOrder}
               busy={busy}
               onAnyPublishedUrlChange={setAnyCardGroupPublishedUrl}
               onError={(msg) => msg && showError(msg)}
@@ -674,6 +696,14 @@ export function ProjectPage() {
               deckPreviewOptions={deckPreviewOptions}
               activeLayoutId={activeLayoutId ?? undefined}
               onCapabilitiesChange={setEditorCaps}
+              projectAssetArtKeys={assets.map((a) => a.artKey)}
+              globalAssetArtKeys={globalAssets.map((a) => a.artKey)}
+              projectId={id}
+              token={token}
+              layoutsFull={layoutsFull}
+              projectAssets={assets}
+              globalAssets={globalAssets}
+              onStudioAssetsRefresh={() => void loadPipeline()}
             />
           )}
         </section>

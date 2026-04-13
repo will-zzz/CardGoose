@@ -48,6 +48,9 @@ type Props = {
   layoutsFull: LayoutLite[];
   onRefresh: () => void;
   onError: (msg: string) => void;
+  /** When set, clicking an asset in the grid picks it (e.g. layout editor fallback modal). */
+  artPickerMode?: boolean;
+  onArtKeyPicked?: (artKey: string) => void;
 };
 
 type ViewKind =
@@ -127,6 +130,8 @@ export function AssetsTabPanel({
   layoutsFull,
   onRefresh,
   onError,
+  artPickerMode = false,
+  onArtKeyPicked,
 }: Props) {
   const [search, setSearch] = useState('');
   const [nav, setNav] = useState<TreeNav>({ scope: 'project', view: { kind: 'all' } });
@@ -816,10 +821,20 @@ export function AssetsTabPanel({
                 <button
                   key={idKey}
                   type="button"
-                  draggable
+                  draggable={!artPickerMode}
                   className={`assets-shell-cell assets-shell-ctrl${selected ? ' assets-shell-cell--selected' : ''}`}
-                  onClick={() => selectAsset(a)}
-                  onDragStart={(e) => onAssetDragStart(e, nav.scope, a.id)}
+                  onClick={() => {
+                    if (artPickerMode && onArtKeyPicked) {
+                      onArtKeyPicked(a.artKey);
+                      return;
+                    }
+                    selectAsset(a);
+                  }}
+                  onDragStart={
+                    artPickerMode
+                      ? undefined
+                      : (e) => onAssetDragStart(e, nav.scope, a.id)
+                  }
                 >
                   <div className={thumbClass}>
                     {a.url ? <img src={a.url} alt="" loading="lazy" /> : <span className="assets-shell-no-prev">No preview</span>}

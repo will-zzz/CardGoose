@@ -18,6 +18,9 @@ vi.mock('@aws-sdk/client-s3', () => ({
   PutObjectCommand: class {
     constructor(public input: unknown) {}
   },
+  PutBucketCorsCommand: class {
+    constructor(public input: unknown) {}
+  },
   GetObjectCommand: class {
     constructor(public input: unknown) {}
   },
@@ -92,7 +95,12 @@ describe('s3 helpers', () => {
     const prevAws = process.env.AWS_ENDPOINT_URL;
     process.env.NODE_ENV = 'development';
     process.env.AWS_ENDPOINT_URL = 'http://localhost:4566';
-    send.mockRejectedValueOnce(new Error('no bucket')).mockResolvedValueOnce({});
+    send
+      .mockRejectedValueOnce(new Error('no bucket'))
+      .mockResolvedValueOnce({})
+      .mockRejectedValueOnce(new Error('no bucket'))
+      .mockResolvedValueOnce({})
+      .mockResolvedValue({});
     const { ensureDevLocalStackBuckets } = await import('./s3.js');
     await ensureDevLocalStackBuckets();
     expect(send.mock.calls.length).toBeGreaterThan(0);
@@ -107,7 +115,12 @@ describe('s3 helpers', () => {
     process.env.AWS_ENDPOINT_URL = 'http://127.0.0.1:4566';
     const err = new Error('exists');
     (err as Error & { name: string }).name = 'BucketAlreadyOwnedByYou';
-    send.mockRejectedValueOnce(new Error('no head')).mockRejectedValueOnce(err);
+    send
+      .mockRejectedValueOnce(new Error('no head'))
+      .mockRejectedValueOnce(err)
+      .mockRejectedValueOnce(new Error('no head'))
+      .mockRejectedValueOnce(err)
+      .mockResolvedValue({});
     const { ensureDevLocalStackBuckets } = await import('./s3.js');
     await ensureDevLocalStackBuckets();
     process.env.NODE_ENV = prevNode;

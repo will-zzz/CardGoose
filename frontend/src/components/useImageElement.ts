@@ -4,13 +4,22 @@ export function useImageElement(url: string | undefined): CanvasImageSource | nu
   const [loaded, setLoaded] = useState<{ u: string; img: CanvasImageSource } | null>(null);
 
   useEffect(() => {
-    if (!url) return;
+    if (!url) {
+      setLoaded(null);
+      return;
+    }
+    let cancelled = false;
     const i = new window.Image();
     i.crossOrigin = 'anonymous';
-    i.onload = () => setLoaded({ u: url, img: i });
-    i.onerror = () => setLoaded(null);
+    i.onload = () => {
+      if (!cancelled) setLoaded({ u: url, img: i });
+    };
+    i.onerror = () => {
+      if (!cancelled) setLoaded(null);
+    };
     i.src = url;
     return () => {
+      cancelled = true;
       i.onload = null;
       i.onerror = null;
     };

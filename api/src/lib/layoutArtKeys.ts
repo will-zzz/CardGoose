@@ -7,8 +7,14 @@ export function collectArtKeysFromLayoutState(state: unknown): string[] {
   function visitNode(n: unknown): void {
     if (!n || typeof n !== 'object') return;
     const o = n as Record<string, unknown>;
-    if (o.type === 'image' && typeof o.artKey === 'string' && o.artKey.trim()) {
-      keys.add(o.artKey.trim());
+    if (o.type === 'image') {
+      if (typeof o.artKey === 'string' && o.artKey.trim()) {
+        keys.add(o.artKey.trim());
+      }
+      const fb = (o as { fallbackArtKey?: unknown }).fallbackArtKey;
+      if (typeof fb === 'string' && fb.trim()) {
+        keys.add(fb.trim());
+      }
     }
     if (o.type === 'group' && Array.isArray(o.children)) {
       for (const c of o.children) visitNode(c);
@@ -22,5 +28,47 @@ export function collectArtKeysFromLayoutState(state: unknown): string[] {
 
   if (!state || typeof state !== 'object') return [];
   visitState(state as Record<string, unknown>);
+  return [...keys];
+}
+
+/**
+ * All strings that may need signed asset URLs for PDF export: layout art keys, fallbacks,
+ * and every non-empty cell value for each image’s `dynamicSourceColumn` across `rows`.
+ */
+export function collectPdfPrefetchArtKeys(
+  layout: unknown,
+  rows: Record<string, string>[]
+): string[] {
+  const keys = new Set<string>();
+  for (const k of collectArtKeysFromLayoutState(layout)) {
+    keys.add(k);
+  }
+
+  function visitNode(n: unknown): void {
+    if (!n || typeof n !== 'object') return;
+    const o = n as Record<string, unknown>;
+    if (o.type === 'image') {
+      const col = o.dynamicSourceColumn;
+      if (typeof col === 'string' && col.trim()) {
+        const c = col.trim();
+        for (const row of rows) {
+          const v = (row[c] ?? '').trim();
+          if (v) keys.add(v);
+        }
+      }
+    }
+    if (o.type === 'group' && Array.isArray(o.children)) {
+      for (const c of o.children) visitNode(c);
+    }
+  }
+
+  function visitState(s: Record<string, unknown>): void {
+    if (Array.isArray(s.root)) for (const n of s.root) visitNode(n);
+    if (Array.isArray(s.elements)) for (const n of s.elements) visitNode(n);
+  }
+
+  if (layout && typeof layout === 'object') {
+    visitState(layout as Record<string, unknown>);
+  }
   return [...keys];
 }

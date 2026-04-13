@@ -98,5 +98,6 @@ describe('buildPdfExportPayload', () => {
     expect(r.payload.type).toBe('export-pdf');
     expect(r.payload.dpi).toBe(200);
     expect(r.payload.assetUrls).toEqual({ art1: 'https://signed.example/asset' });
+    expect(r.payload.assetResolveOrder).toEqual(['art1']);
   });
 });

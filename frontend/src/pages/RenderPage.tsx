@@ -7,6 +7,8 @@ export type HeadlessRenderPayload = {
   layout: unknown;
   row: Record<string, string>;
   assetUrls: Record<string, string>;
+  /** Project art keys first, then global — matches layout editor fuzzy resolver. */
+  assetResolveOrder?: string[];
   pixelWidth: number;
 };
 
@@ -38,6 +40,7 @@ type CardFrame = {
   state: LayoutStateV2;
   row: Record<string, string>;
   assetUrls: Record<string, string>;
+  assetResolveOrder: string[];
   pixelWidth: number;
 };
 
@@ -124,6 +127,9 @@ export function RenderPage() {
           state,
           row: payload.row,
           assetUrls: payload.assetUrls ?? {},
+          assetResolveOrder: Array.isArray(payload.assetResolveOrder)
+            ? payload.assetResolveOrder
+            : [],
           pixelWidth: Math.max(32, Math.round(payload.pixelWidth)),
         });
       } catch (e) {
@@ -179,6 +185,7 @@ export function RenderPage() {
         state={card.state}
         row={card.row}
         assetUrls={card.assetUrls}
+        assetResolveOrder={card.assetResolveOrder}
         pixelWidth={card.pixelWidth}
         layerRef={layerRef}
       />

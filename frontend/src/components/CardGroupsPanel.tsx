@@ -88,6 +88,8 @@ export function CardGroupsPanel(props: {
   token: string | null;
   layoutsFull: LayoutFull[];
   assetUrls: Record<string, string>;
+  /** Project art keys first, then global — for layout image fuzzy matching in previews. */
+  assetResolveOrder?: string[];
   /** Project-wide busy (e.g. layout save); card-group mutations use internal state so previews don’t thrash. */
   busy: boolean;
   /** Fired when group list implies at least one published CSV URL (for studio chrome). */
@@ -100,6 +102,7 @@ export function CardGroupsPanel(props: {
     token,
     layoutsFull,
     assetUrls,
+    assetResolveOrder = [],
     busy,
     onAnyPublishedUrlChange,
     onError,
@@ -586,6 +589,7 @@ export function CardGroupsPanel(props: {
                                   state={previewState}
                                   row={row}
                                   assetUrls={assetUrls}
+                                  assetResolveOrder={assetResolveOrder}
                                   pixelWidth={112}
                                 />
                               </div>

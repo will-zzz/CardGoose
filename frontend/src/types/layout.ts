@@ -25,7 +25,12 @@ export type LayoutImage = LayoutLeafFlags & {
   y: number;
   width: number;
   height: number;
+  /** Legacy template (e.g. {{Column}}); used when dynamicSourceColumn is not set. */
   artKey: string;
+  /** CSV column header: cell value is resolved to an asset (project, then global, fuzzy). */
+  dynamicSourceColumn?: string | null;
+  /** Static art key when the dynamic cell is empty or resolution fails. */
+  fallbackArtKey?: string | null;
 };
 
 export type LayoutRect = LayoutLeafFlags & {

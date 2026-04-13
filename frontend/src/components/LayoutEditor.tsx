@@ -22,12 +22,14 @@ import {
   Text,
   Transformer,
 } from 'react-konva';
-import { Layers, Minus, Plus, Table2 } from 'lucide-react';
+import { Database, Image as ImageLucide, Layers, Minus, Plus, Table2, X } from 'lucide-react';
 import type { LayoutElement, LayoutStateV2 } from '../types/layout';
 import { DEFAULT_NEW_TEXT } from '../types/layout';
-import { resolveImageUrlFromLookup } from '../lib/assetResolve';
+import { normalizeArtLookupKey, smartResolveLayoutImageUrl } from '../lib/assetResolve';
 import { applyTemplate } from '../lib/template';
+import { AssetsTabPanel, type StudioAssetRow } from './AssetsTabPanel';
 import { CardFace } from './CardFace';
+import { ColumnSearchCombobox } from './ColumnSearchCombobox';
 import { useImageElement } from './useImageElement';
 import { LayoutEditorFooterButton, LayoutEditorFooterValueStrip } from './LayoutEditorFooterButton';
 import { ZoneHierarchy, type ZoneHierarchyToolbarProps } from './ZoneHierarchy';
@@ -156,6 +158,7 @@ function ImageShape({
   el,
   sampleRow,
   assetUrls,
+  orderedArtKeys,
   selected,
   setNodeRef,
   onSelect,
@@ -165,13 +168,14 @@ function ImageShape({
   el: Extract<LayoutElement, { type: 'image' }>;
   sampleRow: Record<string, string>;
   assetUrls: Record<string, string>;
+  orderedArtKeys: string[];
   selected: boolean;
   setNodeRef: (id: string, node: Konva.Node | null) => void;
   onSelect: (id: string) => void;
   onDragEnd: (e: KonvaEventObject<DragEvent>) => void;
   onTransformEnd: (e: KonvaEventObject<Event>) => void;
 }) {
-  const url = resolveImageUrlFromLookup(el.artKey, sampleRow, assetUrls);
+  const url = smartResolveLayoutImageUrl(el, sampleRow, assetUrls, orderedArtKeys);
   const img = useImageElement(url);
   const common = {
     id: el.id,
@@ -186,9 +190,11 @@ function ImageShape({
     onDragEnd,
     onTransformEnd,
   };
+  const urlKey = url ?? '';
   if (!img) {
     return (
       <Rect
+        key={`${el.id}-ph-${urlKey}`}
         ref={(r) => setNodeRef(el.id, r)}
         {...common}
         fill="#2a2a32"
@@ -199,6 +205,7 @@ function ImageShape({
   }
   return (
     <KonvaImage
+      key={`${el.id}-img-${urlKey}`}
       ref={(r) => setNodeRef(el.id, r)}
       {...common}
       image={img}
@@ -212,6 +219,7 @@ function EditorNode({
   node,
   selectedId,
   assetUrls,
+  orderedArtKeys,
   sampleRow,
   setNodeRef,
   onSelect,
@@ -221,6 +229,7 @@ function EditorNode({
   node: LayoutElement;
   selectedId: string | null;
   assetUrls: Record<string, string>;
+  orderedArtKeys: string[];
   sampleRow: Record<string, string>;
   setNodeRef: (id: string, node: Konva.Node | null) => void;
   onSelect: (id: string) => void;
@@ -314,6 +323,7 @@ function EditorNode({
       el={node}
       sampleRow={sampleRow}
       assetUrls={assetUrls}
+      orderedArtKeys={orderedArtKeys}
       selected={sel}
       setNodeRef={setNodeRef}
       onSelect={onSelect}
@@ -370,7 +380,11 @@ function propsInspectorTitle(node: LayoutElement | null): string {
     const t = node.text ?? '';
     return t.length > 36 ? `${t.slice(0, 36)}…` : t || 'Text';
   }
-  if (node.type === 'image') return node.artKey || 'Image';
+  if (node.type === 'image') {
+    const c = node.dynamicSourceColumn?.trim();
+    if (c) return `{{${c}}}`;
+    return node.fallbackArtKey || node.artKey || 'Image';
+  }
   return 'Shape';
 }
 
@@ -389,6 +403,8 @@ export type DeckPreviewOption = {
   id: string;
   label: string;
   rows: Record<string, string>[];
+  /** CSV header row — use when row objects omit keys (e.g. empty first row). */
+  headers?: string[];
   /** Card group’s linked layout id, or null for project dataset / sample. */
   layoutId: string | null;
 };
@@ -407,6 +423,8 @@ function defaultPreviewSourceId(
   return options[0].id;
 }
 
+type LayoutLite = { id: string; name: string; state: unknown };
+
 type LayoutEditorProps = {
   state: LayoutStateV2;
   onChange: (next: LayoutStateV2) => void;
@@ -415,6 +433,15 @@ type LayoutEditorProps = {
   deckPreviewOptions: DeckPreviewOption[];
   activeLayoutId?: string | null;
   onCapabilitiesChange?: (c: { canUndo: boolean; canRedo: boolean }) => void;
+  /** Fuzzy resolver: project art keys first, then global. */
+  projectAssetArtKeys?: string[];
+  globalAssetArtKeys?: string[];
+  projectId?: string | null;
+  token?: string | null;
+  layoutsFull?: LayoutLite[];
+  projectAssets?: StudioAssetRow[];
+  globalAssets?: StudioAssetRow[];
+  onStudioAssetsRefresh?: () => void;
 };
 
 export const LayoutEditor = forwardRef<LayoutEditorHandle, LayoutEditorProps>(function LayoutEditor(
@@ -426,6 +453,14 @@ export const LayoutEditor = forwardRef<LayoutEditorHandle, LayoutEditorProps>(fu
     deckPreviewOptions,
     activeLayoutId,
     onCapabilitiesChange,
+    projectAssetArtKeys = [],
+    globalAssetArtKeys = [],
+    projectId = null,
+    token = null,
+    layoutsFull = [],
+    projectAssets = [],
+    globalAssets = [],
+    onStudioAssetsRefresh,
   },
   ref
 ) {
@@ -435,6 +470,7 @@ export const LayoutEditor = forwardRef<LayoutEditorHandle, LayoutEditorProps>(fu
   );
   const [previewSourceMenuOpen, setPreviewSourceMenuOpen] = useState(false);
   const previewSourceMenuRef = useRef<HTMLDivElement>(null);
+  const [assetPickerOpen, setAssetPickerOpen] = useState(false);
   const [canUndo, setCanUndo] = useState(false);
   const [canRedo, setCanRedo] = useState(false);
   const historyPast = useRef<LayoutStateV2[]>([]);
@@ -719,6 +755,8 @@ export const LayoutEditor = forwardRef<LayoutEditorHandle, LayoutEditorProps>(fu
           width: Math.min(120, state.width - 80),
           height: 120,
           artKey: 'art',
+          dynamicSourceColumn: null,
+          fallbackArtKey: null,
           visible: true,
           locked: false,
         };
@@ -752,6 +790,42 @@ export const LayoutEditor = forwardRef<LayoutEditorHandle, LayoutEditorProps>(fu
   const effectiveRows = activePreviewOption?.rows ?? [];
   const effectiveSampleRow = effectiveRows[0] ?? {};
   const filmstripRows = effectiveRows.length > 0 ? effectiveRows : [{}];
+  const dataColumnHeaders = useMemo(() => {
+    const s = new Set<string>();
+    const hdrs = activePreviewOption?.headers;
+    if (Array.isArray(hdrs)) {
+      for (const h of hdrs) {
+        if (typeof h === 'string' && h.trim()) s.add(h.trim());
+      }
+    }
+    for (const r of effectiveRows) {
+      if (r && typeof r === 'object') {
+        for (const k of Object.keys(r)) {
+          if (k.trim()) s.add(k.trim());
+        }
+      }
+    }
+    return [...s].sort((a, b) => a.localeCompare(b, undefined, { sensitivity: 'base' }));
+  }, [effectiveRows, activePreviewOption?.headers]);
+
+  const orderedArtKeys = useMemo(() => {
+    const seen = new Set<string>();
+    const out: string[] = [];
+    for (const k of projectAssetArtKeys) {
+      const n = normalizeArtLookupKey(k);
+      if (seen.has(n)) continue;
+      seen.add(n);
+      out.push(k);
+    }
+    for (const k of globalAssetArtKeys) {
+      const n = normalizeArtLookupKey(k);
+      if (seen.has(n)) continue;
+      seen.add(n);
+      out.push(k);
+    }
+    return out;
+  }, [projectAssetArtKeys, globalAssetArtKeys]);
+
   const [deckPreviewOpen, setDeckPreviewOpen] = useState(false);
   const deckDrawerId = useId();
 
@@ -888,17 +962,58 @@ export const LayoutEditor = forwardRef<LayoutEditorHandle, LayoutEditorProps>(fu
           )}
           {selected?.type === 'image' && (
             <>
-              <details className="props-accordion" open>
-                <summary>Image</summary>
-                <div className="props-accordion-body">
-                  <label>
-                    Art key
-                    <input
-                      type="text"
-                      placeholder="e.g. art or {{Image_Column}}"
-                      value={selected.artKey}
-                      onChange={(e) => updateSelected({ artKey: e.target.value.trim() || 'art' })}
-                    />
+              <details className="props-accordion props-accordion--image-source" open>
+                <summary className="props-accordion-summary-with-icons">
+                  <ImageLucide size={14} aria-hidden />
+                  Image Source
+                </summary>
+                <div className="props-accordion-body props-accordion-body--image-source">
+                  <div className="layout-image-source-hint">
+                    <Database size={12} aria-hidden />
+                    <span>Columns come from the deck preview dataset (footer).</span>
+                  </div>
+                  <ColumnSearchCombobox
+                    label="Dynamic Image (from Data Source)"
+                    options={dataColumnHeaders}
+                    value={selected.dynamicSourceColumn ?? ''}
+                    onChange={(col) =>
+                      updateSelected({
+                        dynamicSourceColumn: col.trim() ? col.trim() : null,
+                      })
+                    }
+                  />
+                  <label className="layout-fallback-label">
+                    <span className="layout-fallback-label-text">Fallback Image</span>
+                    <div className="layout-fallback-row">
+                      <input
+                        type="text"
+                        readOnly
+                        className="layout-fallback-input"
+                        value={selected.fallbackArtKey ?? ''}
+                        placeholder="None — pick from Assets"
+                      />
+                      <button
+                        type="button"
+                        className="layout-fallback-asset-btn"
+                        title="Choose asset"
+                        aria-label="Open asset library"
+                        disabled={!projectId || !token}
+                        onClick={() => setAssetPickerOpen(true)}
+                      >
+                        <ImageLucide size={16} strokeWidth={2} aria-hidden />
+                      </button>
+                      {(selected.fallbackArtKey ?? '').trim() ? (
+                        <button
+                          type="button"
+                          className="layout-fallback-clear-btn"
+                          title="Clear fallback"
+                          aria-label="Clear fallback image"
+                          onClick={() => updateSelected({ fallbackArtKey: null })}
+                        >
+                          ×
+                        </button>
+                      ) : null}
+                    </div>
                   </label>
                 </div>
               </details>
@@ -1024,6 +1139,7 @@ export const LayoutEditor = forwardRef<LayoutEditorHandle, LayoutEditorProps>(fu
                             node={node}
                             selectedId={selectedId}
                             assetUrls={assetUrls}
+                            orderedArtKeys={orderedArtKeys}
                             sampleRow={effectiveSampleRow}
                             setNodeRef={setNodeRef}
                             onSelect={setSelectedId}
@@ -1083,7 +1199,13 @@ export const LayoutEditor = forwardRef<LayoutEditorHandle, LayoutEditorProps>(fu
               return (
                 <div key={i} className="deck-filmstrip-item" title={String(label)}>
                   <div className="deck-filmstrip-thumb">
-                    <CardFace state={state} row={row} assetUrls={assetUrls} pixelWidth={72} />
+                    <CardFace
+                      state={state}
+                      row={row}
+                      assetUrls={assetUrls}
+                      assetResolveOrder={orderedArtKeys}
+                      pixelWidth={72}
+                    />
                   </div>
                 </div>
               );
@@ -1241,6 +1363,53 @@ export const LayoutEditor = forwardRef<LayoutEditorHandle, LayoutEditorProps>(fu
           </LayoutEditorFooterButton>
         </div>
       </footer>
+
+      {assetPickerOpen && projectId && token && (
+        <div
+          className="layout-asset-picker-backdrop"
+          role="presentation"
+          onClick={() => setAssetPickerOpen(false)}
+        >
+          <div
+            className="layout-asset-picker-dialog"
+            role="dialog"
+            aria-modal="true"
+            aria-label="Choose fallback image"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="layout-asset-picker-head">
+              <h2 className="layout-asset-picker-title">Choose asset</h2>
+              <button
+                type="button"
+                className="layout-asset-picker-close"
+                aria-label="Close"
+                onClick={() => setAssetPickerOpen(false)}
+              >
+                <X size={18} aria-hidden />
+              </button>
+            </div>
+            <div className="layout-asset-picker-body">
+              <AssetsTabPanel
+                projectId={projectId}
+                token={token}
+                busy={false}
+                projectAssets={projectAssets}
+                globalAssets={globalAssets}
+                layoutsFull={layoutsFull}
+                onRefresh={() => onStudioAssetsRefresh?.()}
+                onError={(msg) => {
+                  if (msg) console.warn('[AssetsPicker]', msg);
+                }}
+                artPickerMode
+                onArtKeyPicked={(artKey) => {
+                  updateSelected({ fallbackArtKey: artKey });
+                  setAssetPickerOpen(false);
+                }}
+              />
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 });

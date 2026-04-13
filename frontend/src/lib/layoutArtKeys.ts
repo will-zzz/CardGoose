@@ -7,8 +7,14 @@ export function collectArtKeysFromLayoutState(state: unknown): string[] {
   function visitNode(n: unknown): void {
     if (!n || typeof n !== 'object') return;
     const o = n as Record<string, unknown>;
-    if (o.type === 'image' && typeof o.artKey === 'string' && o.artKey.trim()) {
-      keys.add(o.artKey.trim());
+    if (o.type === 'image') {
+      if (typeof o.artKey === 'string' && o.artKey.trim()) {
+        keys.add(o.artKey.trim());
+      }
+      const fb = (o as { fallbackArtKey?: unknown }).fallbackArtKey;
+      if (typeof fb === 'string' && fb.trim()) {
+        keys.add(fb.trim());
+      }
     }
     if (o.type === 'group' && Array.isArray(o.children)) {
       for (const c of o.children) visitNode(c);
