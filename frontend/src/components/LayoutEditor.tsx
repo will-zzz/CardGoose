@@ -22,7 +22,7 @@ import {
   Text,
   Transformer,
 } from 'react-konva';
-import { ChevronDown, Layers, Minus, Plus, Table2 } from 'lucide-react';
+import { Layers, Minus, Plus, Table2 } from 'lucide-react';
 import type { LayoutElement, LayoutStateV2 } from '../types/layout';
 import { DEFAULT_NEW_TEXT } from '../types/layout';
 import { applyTemplate } from '../lib/template';
@@ -491,6 +491,12 @@ export const LayoutEditor = forwardRef<LayoutEditorHandle, LayoutEditorProps>(fu
     setZoomPercent((p) => clampZoomPercent(p - ZOOM_STEP_FINE));
   }, []);
 
+  const deleteSelected = useCallback(() => {
+    if (!selectedId) return;
+    commit({ ...state, root: removeNodeById(state.root, selectedId) });
+    setSelectedId(null);
+  }, [selectedId, state, commit]);
+
   useImperativeHandle(
     ref,
     () => ({
@@ -529,6 +535,14 @@ export const LayoutEditor = forwardRef<LayoutEditorHandle, LayoutEditorProps>(fu
     const onKey = (e: globalThis.KeyboardEvent) => {
       const el = e.target as HTMLElement | null;
       if (el?.closest('input, textarea, select, [contenteditable="true"]')) return;
+
+      if (e.code === 'Delete' || e.code === 'Backspace') {
+        if (!selectedId) return;
+        e.preventDefault();
+        deleteSelected();
+        return;
+      }
+
       const meta = e.metaKey || e.ctrlKey;
       if (!meta) return;
 
@@ -560,7 +574,7 @@ export const LayoutEditor = forwardRef<LayoutEditorHandle, LayoutEditorProps>(fu
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
-  }, [undo, redo, zoomToFit, zoomTo100Percent, zoomInFromMenu, zoomOutFromMenu]);
+  }, [undo, redo, zoomToFit, zoomTo100Percent, zoomInFromMenu, zoomOutFromMenu, selectedId, deleteSelected]);
 
   useLayoutEffect(() => {
     const el = canvasFillRef.current;
@@ -715,11 +729,7 @@ export const LayoutEditor = forwardRef<LayoutEditorHandle, LayoutEditorProps>(fu
         commit({ ...state, root: insertAfterSiblingDeep(state.root, selectedId, dup) });
         setSelectedId(dup.id);
       },
-      onRemove: () => {
-        if (!selectedId) return;
-        commit({ ...state, root: removeNodeById(state.root, selectedId) });
-        setSelectedId(null);
-      },
+      onRemove: deleteSelected,
       onUndo: () => undo(),
       onRedo: () => redo(),
       onToggleGrid: () => commit({ ...state, showGrid: !showGrid }),
@@ -728,7 +738,7 @@ export const LayoutEditor = forwardRef<LayoutEditorHandle, LayoutEditorProps>(fu
       showGrid,
       hasSelection: !!selectedId,
     }),
-    [state, selectedId, commit, undo, redo, canUndo, canRedo, showGrid]
+    [state, selectedId, commit, undo, redo, canUndo, canRedo, showGrid, deleteSelected]
   );
 
   const activePreviewOption = useMemo(() => {
@@ -1100,12 +1110,6 @@ export const LayoutEditor = forwardRef<LayoutEditorHandle, LayoutEditorProps>(fu
               <span className="layout-editor-footer-preview-source-label">
                 {activePreviewOption?.label ?? 'Preview'}
               </span>
-              <ChevronDown
-                size={12}
-                strokeWidth={2}
-                aria-hidden
-                className={`layout-editor-footer-preview-chevron${previewSourceMenuOpen ? ' layout-editor-footer-preview-chevron--open' : ''}`}
-              />
             </LayoutEditorFooterButton>
             {previewSourceMenuOpen && (
               <ul className="deck-preview-source-popover" role="listbox">

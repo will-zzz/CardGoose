@@ -2606,16 +2606,6 @@ label.layout-editor-footer-value-strip {
   white-space: nowrap;
 }
 
-.layout-editor-footer-preview-chevron {
-  flex-shrink: 0;
-  opacity: 0.6;
-  transition: transform 0.18s ease;
-}
-
-.layout-editor-footer-preview-chevron--open {
-  transform: rotate(180deg);
-}
-
 .deck-preview-source-popover {
   position: absolute;
   bottom: calc(100% + 6px);
