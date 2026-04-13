@@ -6,6 +6,7 @@ import {
   Folder,
   FolderPlus,
   Globe,
+  GripVertical,
   ImageOff,
   LayoutTemplate,
   Library,
@@ -23,6 +24,7 @@ import {
   saveAssetFolderStore,
   type AssetFolderScope,
   type AssetFolderStore,
+  type StoredAssetFolder,
 } from '../lib/assetFolderStorage';
 import { normalizeArtLookupKey } from '../lib/assetResolve';
 import { collectArtKeysFromLayoutState } from '../lib/layoutArtKeys';
@@ -58,9 +60,63 @@ type TreeNav = {
   view: ViewKind;
 };
 
+const ASSET_DRAG_MIME = 'application/x-cardgoose-asset';
+const FOLDER_DRAG_MIME = 'application/x-cardgoose-folder';
+
 function assignKey(scope: AssetFolderScope, assetId: string) {
   return `${scope}:${assetId}`;
 }
+
+function foldersByScope(store: AssetFolderStore, scope: AssetFolderScope): StoredAssetFolder[] {
+  return store.folders.filter((f) => f.scope === scope);
+}
+
+function folderAncestorChainNames(
+  store: AssetFolderStore,
+  scope: AssetFolderScope,
+  folderId: string
+): string[] {
+  const byId = new Map(foldersByScope(store, scope).map((f) => [f.id, f]));
+  const names: string[] = [];
+  let cur: string | null = folderId;
+  while (cur) {
+    const f = byId.get(cur);
+    if (!f) break;
+    names.push(f.name);
+    cur = f.parentId;
+  }
+  names.reverse();
+  return names;
+}
+
+/** Virtual path from folder hierarchy + art key, e.g. `/test_folder/will.png` */
+function virtualAssetPath(asset: StudioAssetRow, scope: AssetFolderScope, store: AssetFolderStore): string {
+  const fid = store.assignments[assignKey(scope, asset.id)];
+  const segs = fid ? folderAncestorChainNames(store, scope, fid) : [];
+  const leaf = asset.artKey.replace(/^\/+/, '');
+  if (segs.length === 0) return `/${leaf}`;
+  return `/${segs.join('/')}/${leaf}`;
+}
+
+/** True if `ancestorId` appears on the parent chain above `folderId` (cannot reparent `ancestorId` into `folderId`). */
+function folderHasAncestor(
+  store: AssetFolderStore,
+  scope: AssetFolderScope,
+  folderId: string,
+  ancestorId: string
+): boolean {
+  const byId = new Map(foldersByScope(store, scope).map((f) => [f.id, f]));
+  let cur = byId.get(folderId)?.parentId ?? null;
+  while (cur) {
+    if (cur === ancestorId) return true;
+    cur = byId.get(cur)?.parentId ?? null;
+  }
+  return false;
+}
+
+type TreeDropTarget =
+  | { kind: 'folder'; scope: AssetFolderScope; folderId: string }
+  | { kind: 'library-root'; scope: AssetFolderScope };
 
 export function AssetsTabPanel({
   projectId,
@@ -75,8 +131,8 @@ export function AssetsTabPanel({
   const [search, setSearch] = useState('');
   const [nav, setNav] = useState<TreeNav>({ scope: 'project', view: { kind: 'all' } });
   const [selection, setSelection] = useState<Set<string>>(new Set());
-  const [lastClicked, setLastClicked] = useState<string | null>(null);
   const [thumbRatio, setThumbRatio] = useState<'square' | 'card'>('square');
+  const [dropHover, setDropHover] = useState<string | null>(null);
   const [folderStore, setFolderStore] = useState<AssetFolderStore>(() =>
     loadAssetFolderStore(projectId)
   );
@@ -141,28 +197,12 @@ export function AssetsTabPanel({
     return base.filter((a) => folderStore.assignments[assignKey(nav.scope, a.id)] === fid);
   }, [nav, visibleProject, visibleGlobal, unusedProject, folderStore.assignments]);
 
-  const toggleSelect = (asset: StudioAssetRow, e: React.MouseEvent, list: StudioAssetRow[]) => {
-    e.preventDefault();
+  const selectAsset = (asset: StudioAssetRow) => {
     const prefix = nav.scope === 'project' ? 'p' : 'g';
     const idKey = `${prefix}:${asset.id}`;
-    if (e.shiftKey && lastClicked) {
-      const i0 = list.findIndex((x) => `${prefix}:${x.id}` === lastClicked);
-      const i1 = list.findIndex((x) => x.id === asset.id);
-      if (i0 >= 0 && i1 >= 0) {
-        const [lo, hi] = i0 < i1 ? [i0, i1] : [i1, i0];
-        const next = new Set(selection);
-        for (let i = lo; i <= hi; i++) next.add(`${prefix}:${list[i].id}`);
-        setSelection(next);
-        setLastClicked(idKey);
-        return;
-      }
-    }
-    setLastClicked(idKey);
     setSelection((prev) => {
-      const next = new Set(prev);
-      if (next.has(idKey)) next.delete(idKey);
-      else next.add(idKey);
-      return next;
+      if (prev.size === 1 && prev.has(idKey)) return new Set();
+      return new Set([idKey]);
     });
   };
 
@@ -202,11 +242,6 @@ export function AssetsTabPanel({
     return out;
   }, [selectedAsset, layoutsFull]);
 
-  const foldersForScope = useCallback(
-    (scope: AssetFolderScope) => folderStore.folders.filter((f) => f.scope === scope),
-    [folderStore.folders]
-  );
-
   const childFolders = useCallback(
     (scope: AssetFolderScope, parentId: string | null) =>
       folderStore.folders.filter((f) => f.scope === scope && f.parentId === parentId),
@@ -226,17 +261,87 @@ export function AssetsTabPanel({
     [persistFolderStore]
   );
 
-  const folderOptionsForScope = useMemo(() => {
-    const scope = selectedProjectAsset ? ('project' as const) : selectedGlobalAsset ? ('global' as const) : null;
-    if (!scope) return [];
-    return foldersForScope(scope);
-  }, [selectedProjectAsset, selectedGlobalAsset, foldersForScope]);
+  const selectedAssetScope: AssetFolderScope | null = selectedProjectAsset
+    ? 'project'
+    : selectedGlobalAsset
+      ? 'global'
+      : null;
 
-  const selectedAssetFolderId = useMemo(() => {
-    if (!selectedAsset) return '';
-    const scope: AssetFolderScope = selectedProjectAsset ? 'project' : 'global';
-    return folderStore.assignments[assignKey(scope, selectedAsset.id)] ?? '';
-  }, [selectedAsset, selectedProjectAsset, folderStore.assignments]);
+  const selectedVirtualPath = useMemo(() => {
+    if (!selectedAsset || !selectedAssetScope) return '';
+    return virtualAssetPath(selectedAsset, selectedAssetScope, folderStore);
+  }, [selectedAsset, selectedAssetScope, folderStore]);
+
+  const treeAcceptsInternalDrag = (e: React.DragEvent) =>
+    e.dataTransfer.types.includes(ASSET_DRAG_MIME) || e.dataTransfer.types.includes(FOLDER_DRAG_MIME);
+
+  const leaveDropHost = (e: React.DragEvent) => {
+    const cur = e.currentTarget as HTMLElement;
+    const rel = e.relatedTarget as Node | null;
+    if (rel && cur.contains(rel)) return;
+    setDropHover(null);
+  };
+
+  const handleTreeDrop = useCallback(
+    (e: React.DragEvent, target: TreeDropTarget) => {
+      e.preventDefault();
+      e.stopPropagation();
+      setDropHover(null);
+      let raw = e.dataTransfer.getData(ASSET_DRAG_MIME);
+      if (raw) {
+        try {
+          const { scope, assetId } = JSON.parse(raw) as { scope: AssetFolderScope; assetId: string };
+          if (target.scope !== scope) return;
+          if (target.kind === 'folder') {
+            setAssetFolderAssignment(scope, assetId, target.folderId);
+          } else {
+            setAssetFolderAssignment(scope, assetId, '');
+          }
+        } catch {
+          /* */
+        }
+        return;
+      }
+      raw = e.dataTransfer.getData(FOLDER_DRAG_MIME);
+      if (!raw) return;
+      try {
+        const { scope, folderId } = JSON.parse(raw) as { scope: AssetFolderScope; folderId: string };
+        if (target.scope !== scope) return;
+        if (target.kind === 'folder') {
+          if (folderId === target.folderId) return;
+          persistFolderStore((prev) => {
+            if (folderHasAncestor(prev, scope, target.folderId, folderId)) return prev;
+            return {
+              ...prev,
+              folders: prev.folders.map((f) =>
+                f.id === folderId && f.scope === scope ? { ...f, parentId: target.folderId } : f
+              ),
+            };
+          });
+        } else {
+          persistFolderStore((prev) => ({
+            ...prev,
+            folders: prev.folders.map((f) =>
+              f.id === folderId && f.scope === scope ? { ...f, parentId: null } : f
+            ),
+          }));
+        }
+      } catch {
+        /* */
+      }
+    },
+    [setAssetFolderAssignment, persistFolderStore]
+  );
+
+  const onAssetDragStart = (e: React.DragEvent, scope: AssetFolderScope, assetId: string) => {
+    e.dataTransfer.setData(ASSET_DRAG_MIME, JSON.stringify({ scope, assetId }));
+    e.dataTransfer.effectAllowed = 'move';
+  };
+
+  const onFolderDragStart = (e: React.DragEvent, scope: AssetFolderScope, folderId: string) => {
+    e.dataTransfer.setData(FOLDER_DRAG_MIME, JSON.stringify({ scope, folderId }));
+    e.dataTransfer.effectAllowed = 'move';
+  };
 
   async function uploadFiles(files: FileList | null, target: AssetFolderScope) {
     if (!token || !files?.length) return;
@@ -379,6 +484,8 @@ export function AssetsTabPanel({
     setNav({ scope, view: { kind: 'folder', folderId: id } });
   };
 
+  const dropKeyFolder = (scope: AssetFolderScope, folderId: string) => `folder:${scope}:${folderId}`;
+
   const renderFolderSubtree = (scope: AssetFolderScope, parentId: string | null, depth: number) => {
     const rows = childFolders(scope, parentId)
       .slice()
@@ -388,36 +495,62 @@ export function AssetsTabPanel({
       const hasChildren = childFolders(scope, f.id).length > 0;
       const active =
         nav.scope === scope && nav.view.kind === 'folder' && nav.view.folderId === f.id;
+      const dk = dropKeyFolder(scope, f.id);
       return (
         <div key={f.id}>
           <div
-            className={`assets-shell-tree-row${active ? ' assets-shell-tree-row--active' : ''}`}
-            style={{ paddingLeft: 8 + depth * 14 }}
+            className={`assets-shell-tree-folder-drop${dropHover === dk ? ' assets-shell-tree-drop-host--hover' : ''}`}
+            onDragEnter={() => setDropHover(dk)}
+            onDragOver={(e) => {
+              if (treeAcceptsInternalDrag(e)) {
+                e.preventDefault();
+                e.dataTransfer.dropEffect = 'move';
+              }
+            }}
+            onDragLeave={leaveDropHost}
+            onDrop={(e) => handleTreeDrop(e, { kind: 'folder', scope, folderId: f.id })}
           >
-            {hasChildren ? (
+            <div
+              className={`assets-shell-tree-row${active ? ' assets-shell-tree-row--active' : ''}`}
+              style={{ paddingLeft: 8 + depth * 14 }}
+            >
+              <span
+                className="assets-shell-folder-grip assets-shell-ctrl"
+                draggable
+                onDragStart={(e) => {
+                  e.stopPropagation();
+                  onFolderDragStart(e, scope, f.id);
+                }}
+                title="Drag to move folder"
+                role="presentation"
+              >
+                <GripVertical size={14} aria-hidden />
+              </span>
+              {hasChildren ? (
+                <button
+                  type="button"
+                  className="assets-shell-tree-chev assets-shell-ctrl"
+                  aria-expanded={isOpen}
+                  aria-label={isOpen ? 'Collapse' : 'Expand'}
+                  onClick={(ev) => {
+                    ev.stopPropagation();
+                    toggleFolderExpand(f.id);
+                  }}
+                >
+                  {isOpen ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
+                </button>
+              ) : (
+                <span className="assets-shell-tree-chev-spacer" aria-hidden />
+              )}
               <button
                 type="button"
-                className="assets-shell-tree-chev assets-shell-ctrl"
-                aria-expanded={isOpen}
-                aria-label={isOpen ? 'Collapse' : 'Expand'}
-                onClick={(e) => {
-                  e.stopPropagation();
-                  toggleFolderExpand(f.id);
-                }}
+                className="assets-shell-tree-label assets-shell-ctrl"
+                onClick={() => setNav({ scope, view: { kind: 'folder', folderId: f.id } })}
               >
-                {isOpen ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
+                <Folder size={14} className="assets-shell-tree-ico" aria-hidden />
+                <span className="assets-shell-tree-text">{f.name}</span>
               </button>
-            ) : (
-              <span className="assets-shell-tree-chev-spacer" aria-hidden />
-            )}
-            <button
-              type="button"
-              className="assets-shell-tree-label assets-shell-ctrl"
-              onClick={() => setNav({ scope, view: { kind: 'folder', folderId: f.id } })}
-            >
-              <Folder size={14} className="assets-shell-tree-ico" aria-hidden />
-              <span className="assets-shell-tree-text">{f.name}</span>
-            </button>
+            </div>
           </div>
           {isOpen && hasChildren && (
             <div>{renderFolderSubtree(scope, f.id, depth + 1)}</div>
@@ -443,50 +576,89 @@ export function AssetsTabPanel({
         <nav className="assets-shell-tree" aria-label="Folder hierarchy">
           <div className="assets-shell-tree-block">
             <div
-              className={`assets-shell-tree-row assets-shell-tree-row--root${nav.scope === 'project' ? ' assets-shell-tree-row--scope-on' : ''}`}
+              className={`assets-shell-tree-root-drop${dropHover === 'libroot:project' ? ' assets-shell-tree-drop-host--hover' : ''}`}
+              onDragEnter={() => setDropHover('libroot:project')}
+              onDragOver={(e) => {
+                if (treeAcceptsInternalDrag(e)) {
+                  e.preventDefault();
+                  e.dataTransfer.dropEffect = 'move';
+                }
+              }}
+              onDragLeave={leaveDropHost}
+              onDrop={(e) => handleTreeDrop(e, { kind: 'library-root', scope: 'project' })}
             >
-              <button
-                type="button"
-                className="assets-shell-tree-chev assets-shell-ctrl"
-                aria-expanded={expandedLibrary.has('project')}
-                aria-label={expandedLibrary.has('project') ? 'Collapse' : 'Expand'}
-                onClick={() => toggleLibrary('project')}
+              <div
+                className={`assets-shell-tree-row assets-shell-tree-row--root${nav.scope === 'project' ? ' assets-shell-tree-row--scope-on' : ''}`}
               >
-                {expandedLibrary.has('project') ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
-              </button>
-              <button
-                type="button"
-                className="assets-shell-tree-label assets-shell-ctrl"
-                onClick={() => {
-                  setNav({ scope: 'project', view: { kind: 'all' } });
-                  setExpandedLibrary((s) => new Set(s).add('project'));
-                }}
-              >
-                <Box size={14} className="assets-shell-tree-ico" aria-hidden />
-                <span className="assets-shell-tree-text">Project assets</span>
-              </button>
+                <button
+                  type="button"
+                  className="assets-shell-tree-chev assets-shell-ctrl"
+                  aria-expanded={expandedLibrary.has('project')}
+                  aria-label={expandedLibrary.has('project') ? 'Collapse' : 'Expand'}
+                  onClick={() => toggleLibrary('project')}
+                >
+                  {expandedLibrary.has('project') ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
+                </button>
+                <button
+                  type="button"
+                  className="assets-shell-tree-label assets-shell-ctrl"
+                  onClick={() => {
+                    setNav({ scope: 'project', view: { kind: 'all' } });
+                    setExpandedLibrary((s) => new Set(s).add('project'));
+                  }}
+                >
+                  <Box size={14} className="assets-shell-tree-ico" aria-hidden />
+                  <span className="assets-shell-tree-text">Project assets</span>
+                </button>
+              </div>
             </div>
             {expandedLibrary.has('project') && (
               <div className="assets-shell-tree-nested">
-                <button
-                  type="button"
-                  className={`assets-shell-tree-leaf assets-shell-ctrl${nav.scope === 'project' && nav.view.kind === 'all' ? ' assets-shell-tree-row--active' : ''}`}
-                  style={{ paddingLeft: 36 }}
-                  onClick={() => setNav({ scope: 'project', view: { kind: 'all' } })}
+                <div
+                  className={`assets-shell-tree-leaf-drop${dropHover === 'all:project' ? ' assets-shell-tree-drop-host--hover' : ''}`}
+                  onDragEnter={() => setDropHover('all:project')}
+                  onDragOver={(e) => {
+                    if (treeAcceptsInternalDrag(e)) {
+                      e.preventDefault();
+                      e.dataTransfer.dropEffect = 'move';
+                    }
+                  }}
+                  onDragLeave={leaveDropHost}
+                  onDrop={(e) => handleTreeDrop(e, { kind: 'library-root', scope: 'project' })}
                 >
-                  <Folder size={14} className="assets-shell-tree-ico" aria-hidden />
-                  All assets
-                </button>
-                <button
-                  type="button"
-                  className={`assets-shell-tree-leaf assets-shell-ctrl${nav.scope === 'project' && nav.view.kind === 'unused' ? ' assets-shell-tree-row--active' : ''}`}
-                  style={{ paddingLeft: 36 }}
-                  onClick={() => setNav({ scope: 'project', view: { kind: 'unused' } })}
+                  <button
+                    type="button"
+                    className={`assets-shell-tree-leaf assets-shell-ctrl${nav.scope === 'project' && nav.view.kind === 'all' ? ' assets-shell-tree-row--active' : ''}`}
+                    style={{ paddingLeft: 36 }}
+                    onClick={() => setNav({ scope: 'project', view: { kind: 'all' } })}
+                  >
+                    <Folder size={14} className="assets-shell-tree-ico" aria-hidden />
+                    All assets
+                  </button>
+                </div>
+                <div
+                  className={`assets-shell-tree-leaf-drop${dropHover === 'unused:project' ? ' assets-shell-tree-drop-host--hover' : ''}`}
+                  onDragEnter={() => setDropHover('unused:project')}
+                  onDragOver={(e) => {
+                    if (treeAcceptsInternalDrag(e)) {
+                      e.preventDefault();
+                      e.dataTransfer.dropEffect = 'move';
+                    }
+                  }}
+                  onDragLeave={leaveDropHost}
+                  onDrop={(e) => handleTreeDrop(e, { kind: 'library-root', scope: 'project' })}
                 >
-                  <ImageOff size={14} className="assets-shell-tree-ico" aria-hidden />
-                  Unused
-                  <span className="assets-shell-tree-count">{unusedProject.length}</span>
-                </button>
+                  <button
+                    type="button"
+                    className={`assets-shell-tree-leaf assets-shell-ctrl${nav.scope === 'project' && nav.view.kind === 'unused' ? ' assets-shell-tree-row--active' : ''}`}
+                    style={{ paddingLeft: 36 }}
+                    onClick={() => setNav({ scope: 'project', view: { kind: 'unused' } })}
+                  >
+                    <ImageOff size={14} className="assets-shell-tree-ico" aria-hidden />
+                    Unused
+                    <span className="assets-shell-tree-count">{unusedProject.length}</span>
+                  </button>
+                </div>
                 {renderFolderSubtree('project', null, 1)}
               </div>
             )}
@@ -494,40 +666,66 @@ export function AssetsTabPanel({
 
           <div className="assets-shell-tree-block">
             <div
-              className={`assets-shell-tree-row assets-shell-tree-row--root${nav.scope === 'global' ? ' assets-shell-tree-row--scope-on' : ''}`}
+              className={`assets-shell-tree-root-drop${dropHover === 'libroot:global' ? ' assets-shell-tree-drop-host--hover' : ''}`}
+              onDragEnter={() => setDropHover('libroot:global')}
+              onDragOver={(e) => {
+                if (treeAcceptsInternalDrag(e)) {
+                  e.preventDefault();
+                  e.dataTransfer.dropEffect = 'move';
+                }
+              }}
+              onDragLeave={leaveDropHost}
+              onDrop={(e) => handleTreeDrop(e, { kind: 'library-root', scope: 'global' })}
             >
-              <button
-                type="button"
-                className="assets-shell-tree-chev assets-shell-ctrl"
-                aria-expanded={expandedLibrary.has('global')}
-                aria-label={expandedLibrary.has('global') ? 'Collapse' : 'Expand'}
-                onClick={() => toggleLibrary('global')}
+              <div
+                className={`assets-shell-tree-row assets-shell-tree-row--root${nav.scope === 'global' ? ' assets-shell-tree-row--scope-on' : ''}`}
               >
-                {expandedLibrary.has('global') ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
-              </button>
-              <button
-                type="button"
-                className="assets-shell-tree-label assets-shell-ctrl"
-                onClick={() => {
-                  setNav({ scope: 'global', view: { kind: 'all' } });
-                  setExpandedLibrary((s) => new Set(s).add('global'));
-                }}
-              >
-                <Globe size={14} className="assets-shell-tree-ico" aria-hidden />
-                <span className="assets-shell-tree-text">Global library</span>
-              </button>
+                <button
+                  type="button"
+                  className="assets-shell-tree-chev assets-shell-ctrl"
+                  aria-expanded={expandedLibrary.has('global')}
+                  aria-label={expandedLibrary.has('global') ? 'Collapse' : 'Expand'}
+                  onClick={() => toggleLibrary('global')}
+                >
+                  {expandedLibrary.has('global') ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
+                </button>
+                <button
+                  type="button"
+                  className="assets-shell-tree-label assets-shell-ctrl"
+                  onClick={() => {
+                    setNav({ scope: 'global', view: { kind: 'all' } });
+                    setExpandedLibrary((s) => new Set(s).add('global'));
+                  }}
+                >
+                  <Globe size={14} className="assets-shell-tree-ico" aria-hidden />
+                  <span className="assets-shell-tree-text">Global library</span>
+                </button>
+              </div>
             </div>
             {expandedLibrary.has('global') && (
               <div className="assets-shell-tree-nested">
-                <button
-                  type="button"
-                  className={`assets-shell-tree-leaf assets-shell-ctrl${nav.scope === 'global' && nav.view.kind === 'all' ? ' assets-shell-tree-row--active' : ''}`}
-                  style={{ paddingLeft: 36 }}
-                  onClick={() => setNav({ scope: 'global', view: { kind: 'all' } })}
+                <div
+                  className={`assets-shell-tree-leaf-drop${dropHover === 'all:global' ? ' assets-shell-tree-drop-host--hover' : ''}`}
+                  onDragEnter={() => setDropHover('all:global')}
+                  onDragOver={(e) => {
+                    if (treeAcceptsInternalDrag(e)) {
+                      e.preventDefault();
+                      e.dataTransfer.dropEffect = 'move';
+                    }
+                  }}
+                  onDragLeave={leaveDropHost}
+                  onDrop={(e) => handleTreeDrop(e, { kind: 'library-root', scope: 'global' })}
                 >
-                  <Folder size={14} className="assets-shell-tree-ico" aria-hidden />
-                  All assets
-                </button>
+                  <button
+                    type="button"
+                    className={`assets-shell-tree-leaf assets-shell-ctrl${nav.scope === 'global' && nav.view.kind === 'all' ? ' assets-shell-tree-row--active' : ''}`}
+                    style={{ paddingLeft: 36 }}
+                    onClick={() => setNav({ scope: 'global', view: { kind: 'all' } })}
+                  >
+                    <Folder size={14} className="assets-shell-tree-ico" aria-hidden />
+                    All assets
+                  </button>
+                </div>
                 {renderFolderSubtree('global', null, 1)}
               </div>
             )}
@@ -618,8 +816,10 @@ export function AssetsTabPanel({
                 <button
                   key={idKey}
                   type="button"
+                  draggable
                   className={`assets-shell-cell assets-shell-ctrl${selected ? ' assets-shell-cell--selected' : ''}`}
-                  onClick={(e) => toggleSelect(a, e, gridItems)}
+                  onClick={() => selectAsset(a)}
+                  onDragStart={(e) => onAssetDragStart(e, nav.scope, a.id)}
                 >
                   <div className={thumbClass}>
                     {a.url ? <img src={a.url} alt="" loading="lazy" /> : <span className="assets-shell-no-prev">No preview</span>}
@@ -634,7 +834,7 @@ export function AssetsTabPanel({
           {gridItems.length === 0 && !isDraggingFiles && (
             <p className="assets-shell-empty">
               {nav.view.kind === 'folder'
-                ? 'This folder has no assets yet. Assign assets from the inspector, or pick another folder.'
+                ? 'This folder is empty. Drag assets here from the gallery, or choose another folder.'
                 : 'No assets match this view.'}
             </p>
           )}
@@ -659,37 +859,9 @@ export function AssetsTabPanel({
               )}
             </div>
             <div className="assets-shell-inspector-title">{selectedAsset.artKey}</div>
-            <dl className="assets-shell-meta">
-              <dt>Storage key</dt>
-              <dd className="assets-shell-meta-mono">{selectedAsset.s3Key}</dd>
-              <dt>Asset id</dt>
-              <dd className="assets-shell-meta-mono">{selectedAsset.id}</dd>
-            </dl>
-
-            {(selectedProjectAsset || selectedGlobalAsset) && (
-              <div className="assets-shell-field">
-                <label className="assets-shell-field-label" htmlFor="asset-folder-select">
-                  <Folder size={12} aria-hidden />
-                  Folder
-                </label>
-                <select
-                  id="asset-folder-select"
-                  className="assets-shell-select"
-                  value={selectedAssetFolderId}
-                  onChange={(e) => {
-                    const scope: AssetFolderScope = selectedProjectAsset ? 'project' : 'global';
-                    setAssetFolderAssignment(scope, selectedAsset.id, e.target.value);
-                  }}
-                >
-                  <option value="">Library root (unfiled)</option>
-                  {folderOptionsForScope.map((f) => (
-                    <option key={f.id} value={f.id}>
-                      {f.name}
-                    </option>
-                  ))}
-                </select>
-              </div>
-            )}
+            <div className="assets-shell-resource-path" title={selectedVirtualPath}>
+              {selectedVirtualPath}
+            </div>
 
             {selectedProjectAsset && (
               <button
