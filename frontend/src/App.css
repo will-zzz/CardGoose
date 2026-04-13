@@ -2581,6 +2581,60 @@ label.layout-editor-footer-value-strip {
   justify-content: center;
 }
 
+.layout-editor-footer-start-cluster {
+  display: flex;
+  align-items: stretch;
+  flex-shrink: 0;
+  min-width: 0;
+}
+
+.layout-editor-footer-popover {
+  position: relative;
+  display: flex;
+  align-items: stretch;
+}
+
+.layout-editor-footer-preview-source-btn {
+  max-width: 200px;
+  padding-right: 8px;
+}
+
+.layout-editor-footer-preview-source-label {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.layout-editor-footer-preview-chevron {
+  flex-shrink: 0;
+  opacity: 0.6;
+  transition: transform 0.18s ease;
+}
+
+.layout-editor-footer-preview-chevron--open {
+  transform: rotate(180deg);
+}
+
+.deck-preview-source-popover {
+  position: absolute;
+  bottom: calc(100% + 6px);
+  left: 0;
+  min-width: 220px;
+  max-width: min(320px, 86vw);
+  max-height: min(48vh, 280px);
+  overflow-y: auto;
+  list-style: none;
+  margin: 0;
+  padding: 4px 0;
+  background: rgba(28, 28, 32, 0.98);
+  backdrop-filter: blur(12px);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  box-shadow: 0 8px 28px rgba(0, 0, 0, 0.55);
+  z-index: 50;
+}
+
 .deck-preview-drawer {
   position: absolute;
   left: 0;
@@ -2593,7 +2647,7 @@ label.layout-editor-footer-value-strip {
   transform: translateY(100%);
   transition: transform 0.28s cubic-bezier(0.4, 0, 0.2, 1);
   pointer-events: none;
-  overflow: visible;
+  overflow: hidden;
 }
 
 .deck-preview-drawer--open {
@@ -2685,16 +2739,15 @@ label.layout-editor-footer-value-strip {
 
 .deck-filmstrip--overlay {
   margin-top: 0;
-  height: 132px;
-  min-height: 132px;
+  min-height: 152px;
+  height: 152px;
+  max-height: min(46vh, 260px);
   border-radius: 10px 10px 0 0;
   border-bottom: none;
   box-shadow: 0 -12px 40px rgba(0, 0, 0, 0.55);
-  max-height: min(42vh, 200px);
   background: rgba(22, 22, 22, 0.97);
   backdrop-filter: blur(12px);
-  /* Let the data-source menu drop below the control without clipping */
-  overflow: visible;
+  overflow: hidden;
 }
 
 .deck-filmstrip-head {
@@ -2818,6 +2871,11 @@ label.layout-editor-footer-value-strip {
   padding: 4px 12px 10px;
   overflow-x: auto;
   overflow-y: hidden;
+  align-items: center;
+}
+
+.deck-filmstrip-scroll--full {
+  padding: 12px 14px;
   align-items: center;
 }
 

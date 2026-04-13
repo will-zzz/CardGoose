@@ -6,7 +6,11 @@ import { useToast } from '../contexts/useToast';
 import { parseCsvText } from '../lib/csv';
 import { CardGroupsPanel } from '../components/CardGroupsPanel';
 import { LayoutsListPanel } from '../components/LayoutsListPanel';
-import { LayoutEditor, type LayoutEditorHandle } from '../components/LayoutEditor';
+import {
+  LayoutEditor,
+  type DeckPreviewOption,
+  type LayoutEditorHandle,
+} from '../components/LayoutEditor';
 import { defaultLayoutState, ensureLayoutState, type LayoutStateV2 } from '../types/layout';
 import type { ProjectTab } from '../contexts/studioChromeTypes';
 import { useStudioChrome } from '../contexts/StudioChrome';
@@ -31,6 +35,7 @@ type CardGroupSummary = {
   id: string;
   name: string;
   csvData: CsvData | null;
+  layoutId: string | null;
 };
 
 export function ProjectPage() {
@@ -77,17 +82,28 @@ export function ProjectPage() {
   const csvData = project?.csvData ?? null;
   const sampleRow = useMemo(() => csvData?.rows[0] ?? {}, [csvData]);
 
-  const editorDataSources = useMemo(() => {
-    const sources: { id: string; label: string; rows: Record<string, string>[] }[] = [];
+  const deckPreviewOptions = useMemo((): DeckPreviewOption[] => {
+    const out: DeckPreviewOption[] = [];
     if (csvData && csvData.rows.length > 0) {
-      sources.push({ id: '__project__', label: 'Project data', rows: csvData.rows });
+      out.push({
+        id: '__project__',
+        label: 'Project dataset',
+        rows: csvData.rows,
+        layoutId: null,
+      });
     }
     for (const g of cardGroups) {
-      if (g.csvData && g.csvData.rows.length > 0) {
-        sources.push({ id: g.id, label: g.name, rows: g.csvData.rows });
-      }
+      out.push({
+        id: g.id,
+        label: g.name,
+        rows: g.csvData?.rows ?? [],
+        layoutId: g.layoutId,
+      });
     }
-    return sources;
+    if (out.length === 0) {
+      out.push({ id: '__sample__', label: 'Sample', rows: [], layoutId: null });
+    }
+    return out;
   }, [csvData, cardGroups]);
 
   const loadPipeline = useCallback(async () => {
@@ -109,9 +125,21 @@ export function ProjectPage() {
     if (!token || !id) return;
     try {
       const res = await apiJson<{
-        cardGroups: { id: string; name: string; csvData: CsvData | null }[];
+        cardGroups: {
+          id: string;
+          name: string;
+          csvData: CsvData | null;
+          layoutId: string | null;
+        }[];
       }>(`/api/projects/${id}/card-groups`, { token });
-      setCardGroups(res.cardGroups.map((g) => ({ id: g.id, name: g.name, csvData: g.csvData })));
+      setCardGroups(
+        res.cardGroups.map((g) => ({
+          id: g.id,
+          name: g.name,
+          csvData: g.csvData,
+          layoutId: g.layoutId ?? null,
+        }))
+      );
     } catch {
       // non-critical for layout editor; card groups just won't appear as data sources
     }
@@ -156,6 +184,12 @@ export function ProjectPage() {
     }
     return undefined;
   }, [tab]);
+
+  /** Card groups are edited on the Cards tab; keep layout editor preview options in sync. */
+  useEffect(() => {
+    if (tab !== 'layout' || !token || !id) return;
+    void loadCardGroups();
+  }, [tab, token, id, loadCardGroups]);
 
   const saveLayout = useCallback(async (): Promise<boolean> => {
     if (!token || !id || !activeLayoutId) return false;
@@ -718,8 +752,8 @@ export function ProjectPage() {
               onChange={setEditorState}
               assetUrls={assetUrls}
               sampleRow={sampleRow}
-              deckRows={csvData?.rows ?? []}
-              dataSources={editorDataSources}
+              deckPreviewOptions={deckPreviewOptions}
+              activeLayoutId={activeLayoutId ?? undefined}
               onCapabilitiesChange={setEditorCaps}
             />
           )}
