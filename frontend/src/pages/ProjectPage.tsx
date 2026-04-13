@@ -16,8 +16,6 @@ import {
 import { defaultLayoutState, ensureLayoutState, type LayoutStateV2 } from '../types/layout';
 import type { ProjectTab } from '../contexts/studioChromeTypes';
 import { useStudioChrome } from '../contexts/StudioChrome';
-import { Loader2 } from 'lucide-react';
-
 function cloneLayoutState(s: LayoutStateV2): LayoutStateV2 {
   return JSON.parse(JSON.stringify(s)) as LayoutStateV2;
 }
@@ -80,7 +78,6 @@ export function ProjectPage() {
   const [anyCardGroupPublishedUrl, setAnyCardGroupPublishedUrl] = useState(false);
 
   const csvData = project?.csvData ?? null;
-  const sampleRow = useMemo(() => csvData?.rows[0] ?? {}, [csvData]);
 
   const mergedAssetUrls = useMemo(
     () => buildMergedAssetUrlRecord(assets, globalAssets),
@@ -692,7 +689,6 @@ export function ProjectPage() {
               state={editorState}
               onChange={setEditorState}
               assetUrls={mergedAssetUrls}
-              sampleRow={sampleRow}
               deckPreviewOptions={deckPreviewOptions}
               activeLayoutId={activeLayoutId ?? undefined}
               onCapabilitiesChange={setEditorCaps}

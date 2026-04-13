@@ -145,7 +145,7 @@ export function AssetsTabPanel({
     () => new Set(['project', 'global'])
   );
   const [expandedFolders, setExpandedFolders] = useState<Set<string>>(() => new Set());
-  const [dragDepth, setDragDepth] = useState(0);
+  const [, setDragDepth] = useState(0);
   const [isDraggingFiles, setIsDraggingFiles] = useState(false);
 
   useEffect(() => {

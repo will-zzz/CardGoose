@@ -5,8 +5,9 @@ export function useImageElement(url: string | undefined): CanvasImageSource | nu
 
   useEffect(() => {
     if (!url) {
-      setLoaded(null);
-      return;
+      return () => {
+        setLoaded(null);
+      };
     }
     let cancelled = false;
     const i = new window.Image();
@@ -22,6 +23,7 @@ export function useImageElement(url: string | undefined): CanvasImageSource | nu
       cancelled = true;
       i.onload = null;
       i.onerror = null;
+      setLoaded(null);
     };
   }, [url]);
 

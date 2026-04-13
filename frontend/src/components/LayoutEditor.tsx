@@ -409,6 +409,8 @@ export type DeckPreviewOption = {
   layoutId: string | null;
 };
 
+const EMPTY_PREVIEW_ROWS: Record<string, string>[] = [];
+
 function defaultPreviewSourceId(
   activeLayoutId: string | undefined,
   options: DeckPreviewOption[]
@@ -429,7 +431,6 @@ type LayoutEditorProps = {
   state: LayoutStateV2;
   onChange: (next: LayoutStateV2) => void;
   assetUrls: Record<string, string>;
-  sampleRow: Record<string, string>;
   deckPreviewOptions: DeckPreviewOption[];
   activeLayoutId?: string | null;
   onCapabilitiesChange?: (c: { canUndo: boolean; canRedo: boolean }) => void;
@@ -449,7 +450,6 @@ export const LayoutEditor = forwardRef<LayoutEditorHandle, LayoutEditorProps>(fu
     state,
     onChange,
     assetUrls,
-    sampleRow,
     deckPreviewOptions,
     activeLayoutId,
     onCapabilitiesChange,
@@ -468,6 +468,10 @@ export const LayoutEditor = forwardRef<LayoutEditorHandle, LayoutEditorProps>(fu
   const [previewSourceId, setPreviewSourceId] = useState<string>(() =>
     defaultPreviewSourceId(activeLayoutId ?? undefined, deckPreviewOptions)
   );
+  const activePreviewSourceId = useMemo(() => {
+    if (deckPreviewOptions.some((o) => o.id === previewSourceId)) return previewSourceId;
+    return defaultPreviewSourceId(activeLayoutId ?? undefined, deckPreviewOptions);
+  }, [deckPreviewOptions, activeLayoutId, previewSourceId]);
   const [previewSourceMenuOpen, setPreviewSourceMenuOpen] = useState(false);
   const previewSourceMenuRef = useRef<HTMLDivElement>(null);
   const [assetPickerOpen, setAssetPickerOpen] = useState(false);
@@ -562,14 +566,6 @@ export const LayoutEditor = forwardRef<LayoutEditorHandle, LayoutEditorProps>(fu
   useEffect(() => {
     onCapabilitiesChange?.({ canUndo, canRedo });
   }, [canUndo, canRedo, onCapabilitiesChange]);
-
-  useEffect(() => {
-    setPreviewSourceId((prev) =>
-      deckPreviewOptions.some((o) => o.id === prev)
-        ? prev
-        : defaultPreviewSourceId(activeLayoutId ?? undefined, deckPreviewOptions)
-    );
-  }, [deckPreviewOptions, activeLayoutId]);
 
   useEffect(() => {
     const onKey = (e: globalThis.KeyboardEvent) => {
@@ -785,9 +781,14 @@ export const LayoutEditor = forwardRef<LayoutEditorHandle, LayoutEditorProps>(fu
 
   const activePreviewOption = useMemo(() => {
     if (deckPreviewOptions.length === 0) return undefined;
-    return deckPreviewOptions.find((o) => o.id === previewSourceId) ?? deckPreviewOptions[0];
-  }, [deckPreviewOptions, previewSourceId]);
-  const effectiveRows = activePreviewOption?.rows ?? [];
+    return (
+      deckPreviewOptions.find((o) => o.id === activePreviewSourceId) ?? deckPreviewOptions[0]
+    );
+  }, [deckPreviewOptions, activePreviewSourceId]);
+  const effectiveRows = useMemo(
+    () => activePreviewOption?.rows ?? EMPTY_PREVIEW_ROWS,
+    [activePreviewOption]
+  );
   const effectiveSampleRow = effectiveRows[0] ?? {};
   const filmstripRows = effectiveRows.length > 0 ? effectiveRows : [{}];
   const dataColumnHeaders = useMemo(() => {
@@ -806,7 +807,7 @@ export const LayoutEditor = forwardRef<LayoutEditorHandle, LayoutEditorProps>(fu
       }
     }
     return [...s].sort((a, b) => a.localeCompare(b, undefined, { sensitivity: 'base' }));
-  }, [effectiveRows, activePreviewOption?.headers]);
+  }, [activePreviewOption, effectiveRows]);
 
   const orderedArtKeys = useMemo(() => {
     const seen = new Set<string>();
@@ -1244,8 +1245,8 @@ export const LayoutEditor = forwardRef<LayoutEditorHandle, LayoutEditorProps>(fu
                   <li
                     key={opt.id}
                     role="option"
-                    aria-selected={previewSourceId === opt.id}
-                    className={`deck-filmstrip-source-option${previewSourceId === opt.id ? ' deck-filmstrip-source-option--active' : ''}`}
+                    aria-selected={activePreviewSourceId === opt.id}
+                    className={`deck-filmstrip-source-option${activePreviewSourceId === opt.id ? ' deck-filmstrip-source-option--active' : ''}`}
                     onClick={() => {
                       setPreviewSourceId(opt.id);
                       setPreviewSourceMenuOpen(false);
