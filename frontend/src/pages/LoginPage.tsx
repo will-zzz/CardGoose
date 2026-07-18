@@ -2,7 +2,6 @@ import { useId, useState, type FormEvent } from 'react';
 import { Navigate } from 'react-router-dom';
 import { Loader2 } from 'lucide-react';
 import { BrandLogo } from '../components/BrandLogo';
-import { loadGsiScript } from '../lib/loadGsiScript';
 import { useAuth } from '../contexts/useAuth';
 import { useToast } from '../contexts/useToast';
 
@@ -29,11 +28,6 @@ function GoogleGlyph({ className }: { className?: string }) {
   );
 }
 
-function shouldIgnoreGoogleUiError(code: string): boolean {
-  const c = code.toLowerCase();
-  return c.includes('popup') || c.includes('cancel') || c === 'access_denied';
-}
-
 export function LoginPage() {
   const { user, login, register, loginWithGoogle } = useAuth();
   const { showError } = useToast();
@@ -58,8 +52,12 @@ export function LoginPage() {
     clearMessages();
     setBusy(true);
     try {
-      if (mode === 'login') await login(email, password);
-      else await register(email, password);
+      if (mode === 'login') {
+        await login(email, password);
+      } else {
+        await register(email, password);
+        setInfo('Check your email to confirm your account before signing in.');
+      }
     } catch (err) {
       showError(err instanceof Error ? err.message : 'Request failed');
     } finally {
@@ -69,51 +67,13 @@ export function LoginPage() {
 
   async function onGoogleClick() {
     clearMessages();
-    const cid = import.meta.env.VITE_GOOGLE_CLIENT_ID?.trim();
-    if (!cid) {
-      showError(
-        'Google sign-in is not configured. Set VITE_GOOGLE_CLIENT_ID in your environment (OAuth 2.0 Web client ID).'
-      );
-      return;
-    }
-
     setGoogleBusy(true);
     try {
-      await loadGsiScript();
-      if (!window.google?.accounts?.oauth2) {
-        throw new Error('Google Sign-In did not initialize');
-      }
-
-      const client = window.google.accounts.oauth2.initTokenClient({
-        client_id: cid,
-        scope: 'openid email profile',
-        callback: (tokenResponse) => {
-          void (async () => {
-            try {
-              if (tokenResponse.error) {
-                if (!shouldIgnoreGoogleUiError(tokenResponse.error)) {
-                  showError(
-                    tokenResponse.error_description ??
-                      tokenResponse.error ??
-                      'Google sign-in failed'
-                  );
-                }
-                return;
-              }
-              if (!tokenResponse.access_token) return;
-              await loginWithGoogle(tokenResponse.access_token);
-            } catch (err) {
-              showError(err instanceof Error ? err.message : 'Google sign-in failed');
-            } finally {
-              setGoogleBusy(false);
-            }
-          })();
-        },
-      });
-      client.requestAccessToken({ prompt: '' });
+      await loginWithGoogle();
+      // Supabase redirects the page — nothing more to do here.
     } catch (err) {
       setGoogleBusy(false);
-      showError(err instanceof Error ? err.message : 'Could not start Google sign-in');
+      showError(err instanceof Error ? err.message : 'Google sign-in failed');
     }
   }
 
@@ -147,7 +107,7 @@ export function LoginPage() {
             ) : (
               <GoogleGlyph className="auth-social-icon" />
             )}
-            <span>{googleBusy ? 'Connecting…' : 'Continue with Google'}</span>
+            <span>{googleBusy ? 'Redirecting…' : 'Continue with Google'}</span>
           </button>
         </div>
 
@@ -157,7 +117,7 @@ export function LoginPage() {
           <span className="auth-divider-line" aria-hidden />
         </div>
 
-        <form className="auth-form" onSubmit={onSubmit} aria-busy={busy} noValidate>
+        <form className="auth-form" onSubmit={(e) => void onSubmit(e)} aria-busy={busy} noValidate>
           {info && (
             <p id={infoId} className="auth-banner auth-banner--info" role="status">
               {info}
@@ -190,7 +150,9 @@ export function LoginPage() {
                   className="auth-inline-link"
                   onClick={() => {
                     clearMessages();
-                    setInfo('Password reset is not available in this environment yet.');
+                    setInfo(
+                      'Use "Forgot password?" on the Supabase-powered email you received, or contact support.'
+                    );
                   }}
                 >
                   Forgot password?

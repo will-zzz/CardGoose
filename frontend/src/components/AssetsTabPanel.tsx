@@ -362,21 +362,53 @@ export function AssetsTabPanel({
   async function uploadFiles(files: FileList | null, target: AssetFolderScope) {
     if (!token || !files?.length) return;
     for (const file of Array.from(files)) {
-      const fd = new FormData();
-      fd.append('file', file);
-      const path =
+      // Step 1: get presigned PUT URL from API
+      const urlPath =
         target === 'project'
-          ? `${apiBase()}/api/projects/${projectId}/assets`
-          : `${apiBase()}/api/user/global-assets`;
-      const res = await fetch(path, {
+          ? `${apiBase()}/api/projects/${projectId}/assets/upload-url`
+          : `${apiBase()}/api/user/global-assets/upload-url`;
+      const urlRes = await fetch(urlPath, {
         method: 'POST',
-        headers: { Authorization: `Bearer ${token}` },
-        body: fd,
+        headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ filename: file.name, contentType: file.type }),
       });
-      const text = await res.text();
-      const data = text ? JSON.parse(text) : null;
-      if (!res.ok) {
-        onError((data as { error?: string })?.error ?? res.statusText);
+      const urlText = await urlRes.text();
+      const urlData = urlText ? JSON.parse(urlText) : null;
+      if (!urlRes.ok) {
+        onError((urlData as { error?: string })?.error ?? urlRes.statusText);
+        return;
+      }
+      const { uploadUrl, s3Key, artKey } = urlData as {
+        uploadUrl: string;
+        s3Key: string;
+        artKey: string;
+      };
+
+      // Step 2: PUT file directly to R2 via presigned URL
+      const putRes = await fetch(uploadUrl, {
+        method: 'PUT',
+        headers: { 'Content-Type': file.type },
+        body: file,
+      });
+      if (!putRes.ok) {
+        onError(`Upload to storage failed (${putRes.status})`);
+        return;
+      }
+
+      // Step 3: confirm upload with API to register in DB
+      const confirmPath =
+        target === 'project'
+          ? `${apiBase()}/api/projects/${projectId}/assets/confirm`
+          : `${apiBase()}/api/user/global-assets/confirm`;
+      const confirmRes = await fetch(confirmPath, {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ s3Key, artKey }),
+      });
+      const confirmText = await confirmRes.text();
+      const confirmData = confirmText ? JSON.parse(confirmText) : null;
+      if (!confirmRes.ok) {
+        onError((confirmData as { error?: string })?.error ?? confirmRes.statusText);
         return;
       }
     }

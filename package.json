@@ -8,15 +8,13 @@
     "lint": "pnpm -r run lint",
     "format": "prettier --write \"frontend/**/*.{ts,tsx,js,json,css}\" \"landing/**/*.{ts,js,json,css,html}\" \"api/**/*.{ts,js,json}\"",
     "format:check": "prettier --check \"frontend/**/*.{ts,tsx,js,json,css}\" \"landing/**/*.{ts,js,json,css,html}\" \"api/**/*.{ts,js,json}\"",
-    "test:all": "pnpm --filter api test && cd worker && PYTHONPATH=src python3 -m pytest",
+    "test:all": "pnpm --filter api test",
     "test:coverage": "pnpm --filter api test:coverage",
     "migrate:deploy": "pnpm --filter api prisma:deploy",
     "migrate:deploy:prod": "pnpm --filter api prisma:deploy:prod",
-    "docker:up": "docker compose up -d postgres localstack",
-    "docker:up:local": "docker compose up -d postgres localstack",
+    "docker:up": "docker compose up -d postgres",
     "docker:down": "docker compose down",
-    "dev:local": "docker compose up -d postgres localstack && concurrently -n api,frontend -c blue,green \"pnpm dev:api\" \"pnpm dev:frontend\"",
-    "dev:local:worker": "docker compose up -d postgres localstack && concurrently -n api,frontend,worker -c blue,green,magenta \"pnpm dev:api\" \"pnpm dev:frontend\" \"sh -c 'cd worker && PYTHONPATH=src python3 -m baker.main'\""
+    "dev:local": "docker compose up -d postgres && concurrently -n api,frontend -c blue,green \"pnpm dev:api\" \"pnpm dev:frontend\""
   },
   "devDependencies": {
     "concurrently": "^9.2.1",

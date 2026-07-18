@@ -6,7 +6,6 @@ import { useToast } from '../contexts/useToast';
 import { buildMergedAssetUrlRecord, normalizeArtLookupKey } from '../lib/assetResolve';
 import { AssetsTabPanel } from '../components/AssetsTabPanel';
 import { CardGroupsPanel } from '../components/CardGroupsPanel';
-import { ExportTabPanel } from '../components/ExportTabPanel';
 import { LayoutsListPanel } from '../components/LayoutsListPanel';
 import {
   LayoutEditor,
@@ -21,7 +20,6 @@ function cloneLayoutState(s: LayoutStateV2): LayoutStateV2 {
 }
 
 type Asset = { id: string; artKey: string; s3Key: string; createdAt: string; url?: string };
-type ExportRow = { key: string; url: string };
 type CsvData = { headers: string[]; rows: Record<string, string>[] };
 type ProjectDetail = {
   id: string;
@@ -47,8 +45,6 @@ export function ProjectPage() {
   const { showError } = useToast();
   const [tab, setTab] = useState<ProjectTab>('cards');
   const layoutEditorRef = useRef<LayoutEditorHandle>(null);
-  /** Refresh exports list while a queued PDF may still be processing */
-  const exportPollRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const [editorCaps, setEditorCaps] = useState({ canUndo: false, canRedo: false });
   const [layoutMountNonce, setLayoutMountNonce] = useState(0);
   const [project, setProject] = useState<ProjectDetail | null>(null);
@@ -58,13 +54,7 @@ export function ProjectPage() {
   const [layoutName, setLayoutName] = useState('Default');
   const [assets, setAssets] = useState<Asset[]>([]);
   const [globalAssets, setGlobalAssets] = useState<Asset[]>([]);
-  const [exports, setExports] = useState<ExportRow[]>([]);
   const [busy, setBusy] = useState(false);
-  /** Export tab: PDF export bypasses SQS and can take a while */
-  const [exportPdfLoading, setExportPdfLoading] = useState(false);
-  const [exportPdfStatus, setExportPdfStatus] = useState<string | null>(null);
-  /** Raster DPI for PDF cards (API clamps 150–300) */
-  const [exportPdfDpi, setExportPdfDpi] = useState(150);
   /** Last known persisted snapshot for dirty detection */
   const [savedBaseline, setSavedBaseline] = useState<{
     name: string;
@@ -131,18 +121,12 @@ export function ProjectPage() {
 
   const loadPipeline = useCallback(async () => {
     if (!token || !id) return;
-    const [a, e] = await Promise.all([
-      apiJson<{ assets: Asset[]; globalAssets: Asset[] }>(
-        `/api/projects/${id}/assets?includeUrls=1`,
-        {
-          token,
-        }
-      ),
-      apiJson<{ exports: ExportRow[] }>(`/api/projects/${id}/exports`, { token }),
-    ]);
+    const a = await apiJson<{ assets: Asset[]; globalAssets: Asset[] }>(
+      `/api/projects/${id}/assets?includeUrls=1`,
+      { token }
+    );
     setAssets(a.assets);
     setGlobalAssets(a.globalAssets ?? []);
-    setExports(e.exports);
   }, [token, id]);
 
   const loadCardGroups = useCallback(async () => {
@@ -427,9 +411,9 @@ export function ProjectPage() {
 
   useEffect(() => {
     let t = searchParams.get('tab');
-    if (t === 'pipeline') t = 'export';
+    if (t === 'pipeline' || t === 'export') t = 'cards';
     if (t === 'data') t = 'cards';
-    if (t === 'cards' || t === 'layout' || t === 'layouts' || t === 'assets' || t === 'export') {
+    if (t === 'cards' || t === 'layout' || t === 'layouts' || t === 'assets') {
       setTab(t);
     }
   }, [searchParams]);
@@ -533,49 +517,6 @@ export function ProjectPage() {
     const ok = await saveLayout();
     if (ok) navigateTab('cards');
   }, [layoutIsDirty, saveLayout, navigateTab]);
-
-  const onExport = useCallback(async () => {
-    if (!token || !id) return;
-    setExportPdfLoading(true);
-    setExportPdfStatus(null);
-    try {
-      await apiJson<{ queued: boolean; projectId: string; timestamp: string }>(
-        `/api/projects/${id}/export-pdf`,
-        { method: 'POST', token, body: JSON.stringify({ dpi: exportPdfDpi }) }
-      );
-      setExportPdfStatus(
-        'Export queued — the PDF will show in the list below when the worker finishes (you can keep working).'
-      );
-      await loadPipeline();
-      if (exportPollRef.current) {
-        clearInterval(exportPollRef.current);
-        exportPollRef.current = null;
-      }
-      let ticks = 0;
-      exportPollRef.current = window.setInterval(() => {
-        ticks += 1;
-        void loadPipeline();
-        if (ticks >= 15) {
-          if (exportPollRef.current) clearInterval(exportPollRef.current);
-          exportPollRef.current = null;
-        }
-      }, 8000);
-      window.setTimeout(() => setExportPdfStatus(null), 12_000);
-    } catch (err) {
-      showError(err instanceof Error ? err.message : 'Export failed');
-    } finally {
-      setExportPdfLoading(false);
-    }
-  }, [token, id, loadPipeline, exportPdfDpi, showError]);
-
-  useEffect(() => {
-    return () => {
-      if (exportPollRef.current) {
-        clearInterval(exportPollRef.current);
-        exportPollRef.current = null;
-      }
-    };
-  }, []);
 
   useEffect(() => {
     if (!id || tab !== 'layout') {
@@ -715,18 +656,6 @@ export function ProjectPage() {
           layoutsFull={layoutsFull}
           onRefresh={() => void loadPipeline()}
           onError={(msg) => showError(msg)}
-        />
-      )}
-
-      {tab === 'export' && (
-        <ExportTabPanel
-          busy={busy}
-          exportPdfLoading={exportPdfLoading}
-          exportPdfStatus={exportPdfStatus}
-          exportPdfDpi={exportPdfDpi}
-          onExportPdfDpiChange={setExportPdfDpi}
-          onExportPdf={() => void onExport()}
-          exports={exports}
         />
       )}
     </div>

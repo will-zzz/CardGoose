@@ -1,13 +1,25 @@
 import express from 'express';
 import request from 'supertest';
-import { describe, expect, it } from 'vitest';
-import { signToken } from '../lib/jwt.js';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { authedHeaders } from '../test/auth-test-utils.js';
 import { requireAuth } from './auth.js';
+
+vi.mock('../lib/prisma.js', async () => {
+  const { prisma } = await import('../test/prisma-mock.js');
+  return { prisma };
+});
+
+import { prisma } from '../test/prisma-mock.js';
 
 describe('requireAuth', () => {
   const app = express();
   app.use(requireAuth);
   app.get('/x', (_req, res) => res.json({ ok: true }));
+
+  beforeEach(() => {
+    prisma.user.upsert.mockReset();
+    prisma.user.upsert.mockResolvedValue({});
+  });
 
   it('returns 401 without header', async () => {
     const res = await request(app).get('/x');
@@ -30,9 +42,9 @@ describe('requireAuth', () => {
   });
 
   it('allows valid token', async () => {
-    const token = signToken({ sub: 'u1', username: 'a@b.com' });
-    const res = await request(app).get('/x').set('Authorization', `Bearer ${token}`);
+    const res = await request(app).get('/x').set(authedHeaders());
     expect(res.status).toBe(200);
     expect(res.body).toEqual({ ok: true });
+    expect(prisma.user.upsert).toHaveBeenCalled();
   });
 });

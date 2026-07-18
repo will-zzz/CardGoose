@@ -36,6 +36,12 @@ jobs:
       - name: Build landing site
         run: pnpm --filter landing build
 
+      - name: Build frontend
+        env:
+          VITE_SUPABASE_URL: http://127.0.0.1:54321
+          VITE_SUPABASE_ANON_KEY: ci-placeholder-anon-key
+        run: pnpm --filter frontend build
+
   test-api:
     name: Unit tests (API)
     runs-on: ubuntu-latest
@@ -55,127 +61,8 @@ jobs:
         working-directory: api
         env:
           DATABASE_URL: postgresql://forge:forge@localhost:5432/cardgoose
+          DIRECT_URL: postgresql://forge:forge@localhost:5432/cardgoose
         run: pnpm exec prisma generate
 
       - name: Vitest
         run: pnpm --filter api test
-
-  test-worker:
-    name: Unit tests (Worker)
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-
-      - uses: actions/setup-python@v5
-        with:
-          python-version: "3.12"
-
-      - name: Install & pytest
-        working-directory: worker
-        env:
-          PYTHONPATH: src
-        run: |
-          python -m pip install -r requirements.txt
-          python -m pytest
-
-  build-containers:
-    name: Build Docker images
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-
-      - name: Build API image
-        run: docker build -f api/Dockerfile -t cardgoose-api-ci .
-
-      - name: Verify API image resolves runtime deps (pnpm workspace layout)
-        run: |
-          docker run --rm -w /app/api cardgoose-api-ci \
-            node --input-type=module -e "await import('cors'); console.log('cors ok');"
-
-      - name: Build worker image
-        run: docker build -f worker/Dockerfile worker
-
-  e2e-placeholder:
-    name: E2E (placeholder)
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - name: Placeholder
-        run: |
-          echo "Add Playwright E2E against staging or compose stack."
-          exit 0
-
-  infra-plan:
-    name: Terraform validate
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-
-      - uses: hashicorp/setup-terraform@v3
-        with:
-          terraform_version: "1.9.0"
-
-      - name: Terraform fmt (check)
-        working-directory: infra
-        run: terraform fmt -check -recursive
-
-      - name: Terraform init & validate (AWS / prod stack)
-        working-directory: infra/envs/prod
-        env:
-          AWS_REGION: us-east-1
-          TF_VAR_skip_aws_credential_validation: "true"
-        run: |
-          # No AWS creds in CI; skip S3 backend so init/validate only check config + providers.
-          terraform init -input=false -backend=false
-          terraform validate
-
-  deploy-aws:
-    name: Deploy to AWS (ECR + ECS)
-    runs-on: ubuntu-latest
-    needs: [lint-format, test-api, test-worker, build-containers, infra-plan]
-    # Push to main deploys automatically; workflow_dispatch runs the same deploy when you "Run workflow" on main.
-    if: github.ref == 'refs/heads/main' && (github.event_name == 'push' || github.event_name == 'workflow_dispatch')
-    env:
-      AWS_REGION: us-east-1
-    steps:
-      - uses: actions/checkout@v4
-
-      - name: Configure AWS credentials
-        uses: aws-actions/configure-aws-credentials@v4
-        with:
-          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
-          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-          aws-region: ${{ env.AWS_REGION }}
-
-      - name: Login to Amazon ECR
-        id: login-ecr
-        uses: aws-actions/amazon-ecr-login@v2
-
-      - name: Build and push API image
-        env:
-          ECR_API: ${{ secrets.ECR_API_REPOSITORY_URL }}
-        run: |
-          IMG="${ECR_API}:${{ github.sha }}"
-          docker build -f api/Dockerfile -t "$IMG" -t "$ECR_API:latest" \
-            --build-arg "VITE_GOOGLE_CLIENT_ID=${{ secrets.VITE_GOOGLE_CLIENT_ID }}" .
-          docker run --rm -w /app/api "$IMG" \
-            node --input-type=module -e "await import('cors'); console.log('cors ok');"
-          docker push "$IMG"
-          docker push "$ECR_API:latest"
-
-      - name: Build and push worker image
-        env:
-          ECR_WORKER: ${{ secrets.ECR_WORKER_REPOSITORY_URL }}
-        run: |
-          docker build -f worker/Dockerfile -t "$ECR_WORKER:${{ github.sha }}" -t "$ECR_WORKER:latest" worker
-          docker push "$ECR_WORKER:${{ github.sha }}"
-          docker push "$ECR_WORKER:latest"
-
-      - name: Force new ECS deployment
-        env:
-          CLUSTER: ${{ secrets.ECS_CLUSTER_NAME }}
-          SVC_API: ${{ secrets.ECS_API_SERVICE_NAME }}
-          SVC_WORKER: ${{ secrets.ECS_WORKER_SERVICE_NAME }}
-        run: |
-          aws ecs update-service --cluster "$CLUSTER" --service "$SVC_API" --force-new-deployment
-          aws ecs update-service --cluster "$CLUSTER" --service "$SVC_WORKER" --force-new-deployment
