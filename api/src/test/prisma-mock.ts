@@ -6,6 +6,7 @@ export function createMock(): any {
     user: {
       findUnique: vi.fn(),
       create: vi.fn(),
+      upsert: vi.fn(),
     },
     project: {
       findFirst: vi.fn(),

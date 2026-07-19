@@ -1,25 +1,16 @@
+/**
+ * Auth store backed by Supabase session — no manual localStorage JWT management.
+ * Supabase client handles session persistence in localStorage automatically via
+ * its own `supabase.auth.session` storage key.
+ */
 import type { AuthUser } from './auth-types';
+import type { Session } from '@supabase/supabase-js';
 
-const STORAGE_KEY = 'cardgoose_auth';
-
-type Stored = { token: string; user: AuthUser };
-
-export function loadStored(): Stored | null {
-  try {
-    const raw = localStorage.getItem(STORAGE_KEY);
-    if (!raw) return null;
-    const parsed = JSON.parse(raw) as Stored;
-    if (parsed?.token && parsed?.user?.id && parsed?.user?.username) return parsed;
-  } catch {
-    /* ignore */
-  }
-  return null;
+export function sessionToUser(session: Session | null): AuthUser | null {
+  if (!session?.user?.email) return null;
+  return { id: session.user.id, username: session.user.email };
 }
 
-export function persistAuth(token: string, user: AuthUser): void {
-  localStorage.setItem(STORAGE_KEY, JSON.stringify({ token, user }));
-}
-
-export function clearAuth(): void {
-  localStorage.removeItem(STORAGE_KEY);
+export function sessionToToken(session: Session | null): string | null {
+  return session?.access_token ?? null;
 }

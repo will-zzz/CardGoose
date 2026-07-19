@@ -135,7 +135,7 @@ function AccountMenuProject({
         </DropdownMenuItem>
         <DropdownMenuItem
           className="dropdown-menu-item-row"
-          onSelect={() => navigate(`/projects/${projectId}?tab=export`)}
+          onSelect={() => navigate(`/projects/${projectId}`)}
         >
           Project settings
         </DropdownMenuItem>
@@ -195,7 +195,6 @@ function ProjectTabsBar() {
     { id: 'cards', label: 'Cards' },
     { id: 'layouts', label: 'Layouts' },
     { id: 'assets', label: 'Assets' },
-    { id: 'export', label: 'Export' },
   ];
 
   return (

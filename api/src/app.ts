@@ -5,10 +5,8 @@ import { fileURLToPath } from 'node:url';
 import cors from 'cors';
 import express, { type Express } from 'express';
 import { pinoHttp } from 'pino-http';
-import { authRouter } from './routes/auth.js';
 import { projectsRouter } from './routes/projects.js';
 import { assetsRouter } from './routes/assets.js';
-import { exportsRouter } from './routes/exports.js';
 import { rootLogger } from './lib/logger.js';
 
 /** Express app with all routes and middleware (does not listen). */
@@ -38,15 +36,14 @@ export function createApp(): Express {
     res.json({ status: 'ok', service: 'cardgoose-api' });
   });
 
-  app.use('/api/auth', authRouter);
   app.use('/api/projects', projectsRouter);
   app.use('/api', assetsRouter);
-  app.use('/api', exportsRouter);
 
+  // Serve SPA in local production builds only (Vercel serves frontend separately).
   const appDir = dirname(fileURLToPath(import.meta.url));
   const publicDir = join(appDir, 'public');
   if (existsSync(publicDir) && process.env.NODE_ENV === 'production') {
-    rootLogger.info({ publicDir }, 'Serving SPA from API container');
+    rootLogger.info({ publicDir }, 'Serving SPA from API (local build)');
     app.use(express.static(publicDir));
     app.get('*', (req, res, next) => {
       if (req.method !== 'GET' && req.method !== 'HEAD') return next();

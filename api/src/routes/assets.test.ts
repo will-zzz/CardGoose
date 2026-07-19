@@ -1,10 +1,10 @@
 import request from 'supertest';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { signToken } from '../lib/jwt.js';
+import { authedHeaders } from '../test/auth-test-utils.js';
 
-const s3Mocks = vi.hoisted(() => ({
-  putObject: vi.fn(async () => {}),
+const r2Mocks = vi.hoisted(() => ({
   getSignedGetUrl: vi.fn(async () => 'https://signed.example/o'),
+  getSignedPutUrl: vi.fn(async () => 'https://signed.example/put'),
 }));
 
 vi.mock('../lib/prisma.js', async () => {
@@ -12,10 +12,10 @@ vi.mock('../lib/prisma.js', async () => {
   return { prisma };
 });
 
-vi.mock('../lib/s3.js', () => ({
-  getAssetsBucket: () => 'assets-bucket',
-  putObject: s3Mocks.putObject,
-  getSignedGetUrl: s3Mocks.getSignedGetUrl,
+vi.mock('../lib/r2.js', () => ({
+  getBucket: () => 'cardgoose',
+  getSignedGetUrl: r2Mocks.getSignedGetUrl,
+  getSignedPutUrl: r2Mocks.getSignedPutUrl,
   copyObjectSameBucket: vi.fn(async () => {}),
 }));
 
@@ -25,22 +25,19 @@ import { createApp } from '../app.js';
 
 const app = createApp();
 
-function authed() {
-  const token = signToken({ sub: 'u1', username: 'a@b.com' });
-  return { Authorization: `Bearer ${token}` };
-}
-
 describe('assets routes', () => {
   beforeEach(() => {
-    s3Mocks.putObject.mockClear();
-    s3Mocks.putObject.mockResolvedValue(undefined);
+    r2Mocks.getSignedGetUrl.mockClear();
+    r2Mocks.getSignedPutUrl.mockClear();
+    prisma.user.upsert.mockReset();
+    prisma.user.upsert.mockResolvedValue({});
     prisma.globalAsset.findMany.mockReset();
     prisma.globalAsset.findMany.mockResolvedValue([]);
   });
 
   it('404 when project missing', async () => {
     prisma.project.findFirst.mockResolvedValueOnce(null);
-    const res = await request(app).get('/api/projects/p1/assets').set(authed());
+    const res = await request(app).get('/api/projects/p1/assets').set(authedHeaders());
     expect(res.status).toBe(404);
   });
 
@@ -49,7 +46,7 @@ describe('assets routes', () => {
     prisma.asset.findMany.mockResolvedValueOnce([
       { id: '1', artKey: 'a', s3Key: 'k', createdAt: new Date(), updatedAt: new Date() },
     ]);
-    const res = await request(app).get('/api/projects/p1/assets').set(authed());
+    const res = await request(app).get('/api/projects/p1/assets').set(authedHeaders());
     expect(res.status).toBe(200);
     expect(res.body.assets[0].url).toBeUndefined();
     expect(Array.isArray(res.body.globalAssets)).toBe(true);
@@ -60,45 +57,43 @@ describe('assets routes', () => {
     prisma.asset.findMany.mockResolvedValueOnce([
       { id: '1', artKey: 'a', s3Key: 'k', createdAt: new Date(), updatedAt: new Date() },
     ]);
-    const res = await request(app).get('/api/projects/p1/assets?includeUrls=1').set(authed());
+    const res = await request(app)
+      .get('/api/projects/p1/assets?includeUrls=1')
+      .set(authedHeaders());
     expect(res.status).toBe(200);
     expect(res.body.assets[0].url).toBe('https://signed.example/o');
   });
 
-  it('400 upload without file', async () => {
+  it('400 upload-url without filename', async () => {
     const res = await request(app)
-      .post('/api/projects/p1/assets')
-      .set(authed())
-      .field('artKey', 'hero');
+      .post('/api/projects/p1/assets/upload-url')
+      .set(authedHeaders())
+      .send({ contentType: 'image/png' });
     expect(res.status).toBe(400);
   });
 
-  it('404 upload when project missing', async () => {
+  it('404 upload-url when project missing', async () => {
     prisma.project.findFirst.mockResolvedValueOnce(null);
     const res = await request(app)
-      .post('/api/projects/p1/assets')
-      .set(authed())
-      .attach('file', Buffer.from('x'), 'x.png');
+      .post('/api/projects/p1/assets/upload-url')
+      .set(authedHeaders())
+      .send({ filename: 'x.png', contentType: 'image/png' });
     expect(res.status).toBe(404);
   });
 
-  it('uses sanitized filename when artKey omitted', async () => {
+  it('returns presigned upload URL', async () => {
     prisma.project.findFirst.mockResolvedValueOnce({ id: 'p1' } as never);
-    prisma.asset.upsert.mockResolvedValueOnce({
-      id: 'a1',
-      artKey: 'x',
-      s3Key: 'p1/x',
-      createdAt: new Date(),
-      updatedAt: new Date(),
-    });
     const res = await request(app)
-      .post('/api/projects/p1/assets')
-      .set(authed())
-      .attach('file', Buffer.from('x'), 'weird!!!name?.png');
-    expect(res.status).toBe(201);
+      .post('/api/projects/p1/assets/upload-url')
+      .set(authedHeaders())
+      .send({ filename: 'card.png', contentType: 'image/png', artKey: 'hero' });
+    expect(res.status).toBe(200);
+    expect(res.body.uploadUrl).toBe('https://signed.example/put');
+    expect(res.body.artKey).toBe('hero');
+    expect(r2Mocks.getSignedPutUrl).toHaveBeenCalled();
   });
 
-  it('uses explicit artKey from body', async () => {
+  it('201 confirm upload', async () => {
     prisma.project.findFirst.mockResolvedValueOnce({ id: 'p1' } as never);
     prisma.asset.upsert.mockResolvedValueOnce({
       id: 'a1',
@@ -108,27 +103,10 @@ describe('assets routes', () => {
       updatedAt: new Date(),
     });
     const res = await request(app)
-      .post('/api/projects/p1/assets')
-      .set(authed())
-      .field('artKey', 'hero')
-      .attach('file', Buffer.from('d'), 'ignored.png');
+      .post('/api/projects/p1/assets/confirm')
+      .set(authedHeaders())
+      .send({ s3Key: 'p1/hero', artKey: 'hero' });
     expect(res.status).toBe(201);
-  });
-
-  it('201 upload file', async () => {
-    prisma.project.findFirst.mockResolvedValueOnce({ id: 'p1' } as never);
-    prisma.asset.upsert.mockResolvedValueOnce({
-      id: 'a1',
-      artKey: 'pic',
-      s3Key: 'p1/pic',
-      createdAt: new Date(),
-      updatedAt: new Date(),
-    });
-    const res = await request(app)
-      .post('/api/projects/p1/assets')
-      .set(authed())
-      .attach('file', Buffer.from('png-bytes'), 'card.png');
-    expect(res.status).toBe(201);
-    expect(s3Mocks.putObject).toHaveBeenCalled();
+    expect(res.body.asset.artKey).toBe('hero');
   });
 });

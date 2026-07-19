@@ -1,4 +1,3 @@
-import type { JwtPayload } from 'jsonwebtoken';
 import type { Logger } from 'pino';
 
 declare global {
@@ -10,7 +9,6 @@ declare global {
         id: string;
         username: string;
       };
-      jwtPayload?: string | JwtPayload;
     }
   }
 }

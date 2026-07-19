@@ -3,17 +3,17 @@ generator client {
 }
 
 datasource db {
-  provider = "postgresql"
-  url      = env("DATABASE_URL")
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
 }
 
-/// Auth: unique `username` stores normalized email; password optional for Google-only accounts.
+/// Auth: Supabase Auth manages passwords/sessions. id matches auth.users.id.
 model User {
-  id           String   @id @default(uuid()) @db.Uuid
-  username     String   @unique
-  passwordHash String?  @map("password_hash")
-  createdAt DateTime  @default(now()) @map("created_at")
-  updatedAt DateTime  @updatedAt @map("updated_at")
+  id        String   @id @db.Uuid
+  username  String   @unique
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
 
   projects     Project[]
   globalAssets GlobalAsset[]
@@ -88,7 +88,7 @@ model Layout {
   @@index([lastUpdated])
 }
 
-/// art_key -> S3 location; layouts reference keys, not raw paths.
+/// art_key -> R2 location; layouts reference keys, not raw paths.
 model Asset {
   id        String   @id @default(uuid()) @db.Uuid
   projectId String   @map("project_id") @db.Uuid

@@ -1,56 +1,51 @@
-import { useCallback, useMemo, useState, type ReactNode } from 'react';
-import { apiJson } from '../lib/api';
+import { useCallback, useEffect, useMemo, useState, type ReactNode } from 'react';
+import { supabase } from '../lib/supabase';
 import { AuthContext } from './auth-context';
 import type { AuthUser } from './auth-types';
-import { clearAuth, loadStored, persistAuth } from './auth-store';
+import { sessionToToken, sessionToUser } from './auth-store';
 
 export function AuthProvider({ children }: { children: ReactNode }) {
-  const [{ token, user }, setAuth] = useState(() => {
-    const s = loadStored();
-    return { token: s?.token ?? null, user: s?.user ?? null };
-  });
+  const [token, setToken] = useState<string | null>(null);
+  const [user, setUser] = useState<AuthUser | null>(null);
 
-  const persist = useCallback((t: string, u: AuthUser) => {
-    setAuth({ token: t, user: u });
-    persistAuth(t, u);
+  // Initialize from the current Supabase session and subscribe to auth changes.
+  useEffect(() => {
+    // Get current session synchronously (Supabase restores from localStorage).
+    void supabase.auth.getSession().then(({ data: { session } }) => {
+      setToken(sessionToToken(session));
+      setUser(sessionToUser(session));
+    });
+
+    const {
+      data: { subscription },
+    } = supabase.auth.onAuthStateChange((_event, session) => {
+      setToken(sessionToToken(session));
+      setUser(sessionToUser(session));
+    });
+
+    return () => subscription.unsubscribe();
   }, []);
 
-  const login = useCallback(
-    async (email: string, password: string) => {
-      const data = await apiJson<{ token: string; user: AuthUser }>('/api/auth/login', {
-        method: 'POST',
-        body: JSON.stringify({ email, password }),
-      });
-      persist(data.token, data.user);
-    },
-    [persist]
-  );
+  const login = useCallback(async (email: string, password: string) => {
+    const { error } = await supabase.auth.signInWithPassword({ email, password });
+    if (error) throw new Error(error.message);
+  }, []);
 
-  const register = useCallback(
-    async (email: string, password: string) => {
-      const data = await apiJson<{ token: string; user: AuthUser }>('/api/auth/register', {
-        method: 'POST',
-        body: JSON.stringify({ email, password }),
-      });
-      persist(data.token, data.user);
-    },
-    [persist]
-  );
+  const register = useCallback(async (email: string, password: string) => {
+    const { error } = await supabase.auth.signUp({ email, password });
+    if (error) throw new Error(error.message);
+  }, []);
 
-  const loginWithGoogle = useCallback(
-    async (accessToken: string) => {
-      const data = await apiJson<{ token: string; user: AuthUser }>('/api/auth/google', {
-        method: 'POST',
-        body: JSON.stringify({ accessToken }),
-      });
-      persist(data.token, data.user);
-    },
-    [persist]
-  );
+  const loginWithGoogle = useCallback(async () => {
+    const { error } = await supabase.auth.signInWithOAuth({
+      provider: 'google',
+      options: { redirectTo: window.location.origin },
+    });
+    if (error) throw new Error(error.message);
+  }, []);
 
-  const logout = useCallback(() => {
-    setAuth({ token: null, user: null });
-    clearAuth();
+  const logout = useCallback(async () => {
+    await supabase.auth.signOut();
   }, []);
 
   const value = useMemo(

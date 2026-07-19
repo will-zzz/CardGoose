@@ -17,114 +17,122 @@ Designing board games is hard. It requires **rapid iteration** and the ability t
 - Import data from Google Sheets & refresh for live updates
 - Component layout editor for card design
   - Deck preview to evaluate changes
-- Custom images
-- PDF export
+- Custom images (direct upload to Cloudflare R2)
 - TTS export (coming soon)
 
 # Getting started
+
+## Stack
+
+| Component | Service |
+| --- | --- |
+| Database | Supabase Postgres |
+| Auth | Supabase Auth |
+| Object storage | Cloudflare R2 |
+| API | Express on Vercel Serverless |
+| Frontend | Vite SPA on Vercel (`app.cardgoose.com`) |
+| Landing | Cloudflare Workers |
 
 ## Prerequisites
 
 - Node.js 20+
 - [pnpm](https://pnpm.io/) 9+
-- Python 3.12+ recommended — for the PDF worker: `cd worker && python3 -m venv .venv && source .venv/bin/activate && pip install -r requirements.txt && playwright install chromium`
-- [AWS CLI](https://docs.aws.amazon.com/cli/latest/userguide/getting-started-install.html) — for **production** operations (e.g. Prisma against RDS); not needed for fully local dev
-- Docker — **fully local** dev (Postgres + LocalStack)
-- Terraform 1.9+ — **production** infrastructure ([`infra/envs/prod`](infra/envs/prod))
+- Docker (optional — local Postgres via Compose)
+- [Supabase CLI](https://supabase.com/docs/guides/cli) (recommended for local auth)
+- Cloudflare account with R2 bucket (for asset uploads)
 
 ---
 
-## Local development (recommended)
+## Local development
 
-Develop against **Docker Postgres** and **LocalStack** (S3/SQS). No real AWS calls. When you are ready, **push to `main`** and [GitHub Actions](.github/workflows/ci.yml) builds and deploys to ECS.
+### 1. Environment
 
-| Piece                   | Where it runs locally              |
-| ----------------------- | ---------------------------------- |
-| Frontend + API + worker | Your machine                       |
-| Database                | Docker Postgres (`localhost:5433`) |
-| S3 / SQS                | LocalStack (`localhost:4566`)      |
+```bash
+cp .env.local.example .env.local
+cp frontend/.env.local.example frontend/.env.local
+```
 
-The API container can serve the built SPA in production (`NODE_ENV=production`). Until you add a stable URL (ALB, CloudFront, etc.), you may use the task public IP for smoke tests.
+Fill in Supabase and R2 credentials. For local Supabase:
 
-### Setup
+```bash
+supabase start
+# Copy API URL + anon key into .env.local and frontend/.env.local
+```
 
-1. **One-time:** copy [`.env.local.example`](.env.local.example) to **`.env.local`** at the repo root. It sets LocalStack (`AWS_ENDPOINT_URL`), Docker Postgres on **5433**, and `cardgoose-*` buckets/queue names that match [`docker-compose.yml`](docker-compose.yml) and [`docker/localstack-ready.d/init-aws.sh`](docker/localstack-ready.d/init-aws.sh). Optional `CARDGOOSE_DEV_PROFILE=fully-local` makes the API exit on startup if values look like real AWS/RDS by mistake.
+### 2. Database
 
-2. **Start the app** (Postgres + LocalStack, then API + Vite):
+With Docker Postgres (port **5433**):
+
+```bash
+pnpm docker:up
+pnpm migrate:deploy
+```
+
+Or point `DATABASE_URL` / `DIRECT_URL` at your Supabase local Postgres (port **54322**).
+
+### 3. Run
 
 ```bash
 pnpm dev:local
 ```
 
-Or start backing services only, then run processes yourself:
+Or separately:
 
 ```bash
-pnpm docker:up
-pnpm migrate:deploy
 pnpm dev:api
 pnpm dev:frontend
 ```
 
-`pnpm docker:up` and `pnpm docker:up:local` are equivalent (Postgres on **5433**, LocalStack on **4566**).
+Open the URL Vite prints (usually `http://localhost:5173`).
 
-3. **First run / after schema changes:**
-
-```bash
-pnpm migrate:deploy
-```
-
-4. Open the URL Vite prints (often `http://localhost:5173`).
-
-**PDF exports:** use `pnpm dev:local:worker` to run API + Vite + the Python worker together, or run the worker in another terminal (see [`worker/README.md`](worker/README.md)). Set `RENDER_URL` in `.env.local` to the exact origin Vite prints (including port). If the worker runs in Docker and Vite on the host, use something like `http://host.docker.internal:5173`.
-
-Do **not** set `VITE_API_URL` in `frontend/.env.local` when the dev server should proxy `/api` and `/health` to `http://localhost:3001` (see [`frontend/vite.config.ts`](frontend/vite.config.ts)).
-
-**Optional — UI only against a deployed API:** copy [`frontend/.env.local.example`](frontend/.env.local.example) to `frontend/.env.local`, set `VITE_API_URL` to your ECS task URL, run `pnpm dev:frontend`. You may need CORS configured on the deployed API for `http://localhost:5173`.
-
-**Troubleshooting (local):** After a **Docker / LocalStack restart**, S3 buckets may be missing; the dev API **creates missing `S3_BUCKET_*` buckets** when `AWS_ENDPOINT_URL` points at LocalStack (**4566**). If you still see **`NoSuchBucket`**, seed manually, then restart `pnpm dev:local`:
-
-```bash
-aws --endpoint-url=http://localhost:4566 s3 mb s3://cardgoose-assets  2>/dev/null || true
-aws --endpoint-url=http://localhost:4566 s3 mb s3://cardgoose-exports 2>/dev/null || true
-aws --endpoint-url=http://localhost:4566 sqs create-queue --queue-name cardgoose-pdf-generation 2>/dev/null || true
-```
-
-Or: `docker compose restart localstack` (from the repo root, with compose services up).
+Do **not** set `VITE_API_URL` when using the Vite dev proxy (`frontend/vite.config.ts` forwards `/api` → `localhost:3001`).
 
 ---
 
-## Production (AWS)
+## Production setup
 
-**Production** means the **API and worker run on ECS Fargate**, with **RDS, S3, and SQS** from Terraform. CI deploys on push to `main` (see [`.github/workflows/ci.yml`](.github/workflows/ci.yml)).
+### Supabase
 
-1. **Infrastructure** — follow [infra/BOOTSTRAP.md](infra/BOOTSTRAP.md) and apply [`infra/envs/prod`](infra/envs/prod).
+1. Create a project at [supabase.com](https://supabase.com).
+2. Copy **Project URL**, **anon key**, and Postgres connection strings (`DATABASE_URL` with pooler, `DIRECT_URL` without).
+3. Enable Google OAuth under Authentication → Providers if needed.
 
-2. **Prisma against RDS (from your laptop)** — copy [`.env.production.example`](.env.production.example) to **`.env.production`** (never commit) with `DATABASE_URL` and AWS resource names matching Terraform outputs. Then:
+### Cloudflare R2
+
+1. Create bucket `cardgoose`.
+2. Create R2 API token with read/write on that bucket.
+3. Set `R2_ACCOUNT_ID`, `R2_ACCESS_KEY_ID`, `R2_SECRET_ACCESS_KEY`, `R2_BUCKET`.
+
+### Vercel (two projects recommended)
+
+**API project** — root directory `api`, uses `api/vercel.json`:
+
+- `DATABASE_URL`, `DIRECT_URL`
+- `SUPABASE_URL`, `SUPABASE_ANON_KEY`
+- `R2_*` vars
+- `CORS_ORIGIN=https://app.cardgoose.com`
+
+**Frontend project** — root directory `frontend`, uses `frontend/vercel.json`:
+
+- `VITE_SUPABASE_URL`, `VITE_SUPABASE_ANON_KEY`
+- `VITE_API_URL` → your API Vercel URL
+
+Run migrations against production once:
 
 ```bash
-pnpm migrate:deploy:prod
+DATABASE_URL=... DIRECT_URL=... pnpm migrate:deploy:prod
 ```
 
-ECS tasks do **not** read `.env.production`; they get env from Terraform.
-
-3. **Deploy** — push to `main`: lint, tests, Docker builds, ECR push, ECS rolling update. Run the same checks locally first: `pnpm run format:check`, `pnpm -r run lint`, `pnpm test:all`.
-
-4. **Smoke** — `GET /health` on a running API task; `service` should be `cardgoose-api`. Confirm whether the API container runs migrations on startup so you do not apply twice ([`api/Dockerfile`](api/Dockerfile)).
+Vercel auto-deploys from GitHub on push to `main`. CI runs lint, tests, and builds — see [`.github/workflows/ci.yml`](.github/workflows/ci.yml).
 
 ---
 
 ## Environment files
 
-| File                                                 | Purpose                                                                                                                                  |
-| ---------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------- |
-| [`.env.local.example`](.env.local.example)           | Template → **`.env.local`** — local dev (Docker Postgres + LocalStack). Used by `pnpm dev:local`, `pnpm dev:api`, `pnpm migrate:deploy`. |
-| [`.env.production.example`](.env.production.example) | Template → **`.env.production`** — **only** for `pnpm migrate:deploy:prod` against RDS.                                                  |
-
-The API loads **`.env.local`** via `dotenv-cli` on `pnpm dev` scripts. The worker loads **`.env.local`** when run locally ([`worker/README.md`](worker/README.md)).
-
-If you still have a root **`.env`** from an older setup, merge into `.env.local` and remove `.env`.
-
-**Docker Compose API:** `docker compose up api` runs `prisma migrate deploy` before `node` (see [`docker-compose.yml`](docker-compose.yml)).
+| File | Purpose |
+| --- | --- |
+| [`.env.local.example`](.env.local.example) | Template → **`.env.local`** — API (Postgres, Supabase, R2) |
+| [`frontend/.env.local.example`](frontend/.env.local.example) | Template → **`frontend/.env.local`** — Vite (Supabase client) |
 
 ---
 
@@ -134,6 +142,5 @@ If you still have a root **`.env`** from an older setup, merge into `.env.local`
 pnpm run format:check
 pnpm -r run lint
 pnpm test:all
-cd infra && terraform fmt -check -recursive
-cd infra/envs/prod && terraform init -input=false && terraform validate
+pnpm --filter frontend build
 ```

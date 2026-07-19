@@ -1,6 +1,6 @@
 import request from 'supertest';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { signToken } from '../lib/jwt.js';
+import { authedHeaders } from '../test/auth-test-utils.js';
 
 vi.mock('../lib/prisma.js', async () => {
   const { prisma } = await import('../test/prisma-mock.js');
@@ -13,13 +13,14 @@ import { createApp } from '../app.js';
 const app = createApp();
 
 function authed() {
-  const token = signToken({ sub: 'u1', username: 'a@b.com' });
-  return { Authorization: `Bearer ${token}` };
+  return authedHeaders();
 }
 
 describe('projects routes', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    prisma.user.upsert.mockReset();
+    prisma.user.upsert.mockResolvedValue({});
   });
 
   afterEach(() => {
