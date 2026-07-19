@@ -43,6 +43,13 @@ export function ProjectPage() {
   const { setLayoutEditorChrome, setProjectViewNav } = useStudioChrome();
   const { token } = useAuth();
   const { showError } = useToast();
+  // Stable so child panels' load effects don't re-fire on every ProjectPage render.
+  const handlePanelError = useCallback(
+    (msg: string | null) => {
+      if (msg) showError(msg);
+    },
+    [showError]
+  );
   const [tab, setTab] = useState<ProjectTab>('cards');
   const layoutEditorRef = useRef<LayoutEditorHandle>(null);
   const [editorCaps, setEditorCaps] = useState({ canUndo: false, canRedo: false });
@@ -597,7 +604,7 @@ export function ProjectPage() {
               assetResolveOrder={assetResolveOrder}
               busy={busy}
               onAnyPublishedUrlChange={setAnyCardGroupPublishedUrl}
-              onError={(msg) => msg && showError(msg)}
+              onError={handlePanelError}
               onOpenLayoutInEditor={openLayoutInEditor}
             />
           </section>
@@ -613,7 +620,7 @@ export function ProjectPage() {
               lastUpdated: l.lastUpdated,
             }))}
             busy={busy}
-            onError={(msg) => msg && showError(msg)}
+            onError={handlePanelError}
             onOpenLayout={openLayoutInEditor}
             onCreateLayout={createLayoutFromList}
             onDeleteLayout={deleteLayout}
@@ -655,7 +662,7 @@ export function ProjectPage() {
           globalAssets={globalAssets}
           layoutsFull={layoutsFull}
           onRefresh={() => void loadPipeline()}
-          onError={(msg) => showError(msg)}
+          onError={handlePanelError}
         />
       )}
     </div>
